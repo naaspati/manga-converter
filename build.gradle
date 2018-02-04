@@ -1,0 +1,37 @@
+
+apply plugin: 'java'
+apply plugin: 'application'
+
+// i complicated this app too much, so skipping unit testing
+
+repositories {
+    jcenter()
+}
+dependencies {
+   // compile files('myutils.jar')
+   // compile files(/C:\Users\Sameer\Documents\MEGA\eclipse_workplace\java\MyUtils\myutils.jar/)
+   compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
+   // compile group: 'org.jsoup', name: 'jsoup', version: '1.10.3'
+  // testCompile 'junit:junit:4.12'
+}
+
+version = 1.83
+sourceCompatibility = JavaVersion.VERSION_1_8 
+targetCompatibility = JavaVersion.VERSION_1_8
+ 
+mainClassName = 'App'
+
+task copy(type: Copy) {
+  from(fileTree("$buildDir/install/${distributions.main.baseName}"))
+  into(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter/)
+}
+
+jar {
+  manifest {
+        attributes('Manifest-Version': '1.0',
+                   'Implementation-Version': version,
+                   'Main-Class':"$mainClassName",	
+                   'Class-Path':'.'
+                   )
+    }
+}
