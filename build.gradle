@@ -8,9 +8,11 @@ repositories {
     jcenter()
 }
 dependencies {
-   // compile files('myutils.jar')
+    compile files('myutils.jar')
    // compile files(/C:\Users\Sameer\Documents\MEGA\eclipse_workplace\java\MyUtils\myutils.jar/)
    compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
+   // compile 'args4j:args4j:2.33'
+   compile "com.beust:jcommander:1.71"
    // compile group: 'org.jsoup', name: 'jsoup', version: '1.10.3'
   // testCompile 'junit:junit:4.12'
 }
@@ -19,11 +21,26 @@ version = 1.83
 sourceCompatibility = JavaVersion.VERSION_1_8 
 targetCompatibility = JavaVersion.VERSION_1_8
  
-mainClassName = 'App'
+mainClassName = 'samrock.converters.app.main.App'
+
+run {
+  if(System.properties['args'])  //pass args from cmd as -Dargs="args separated by space"
+    args System.properties['args'].split(' ')
+    
+  /*
+  environment.MAX_FILE_NUMBER = 20
+  environment.SKIP_DOUBLE_PAGE_CHECK = true
+  environment.SKIP_NUMBER_MISSINGS_CHECK = true
+  environment.SKIP_PAGE_SIZE_CHECK = true
+  environment.SKIP_FISHY_CHECK = true
+  environment.CHAPTERS_DATA_FILE = 'environment.txt'
+  */
+}
 
 task copy(type: Copy) {
   from(fileTree("$buildDir/install/${distributions.main.baseName}"))
-  into(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter/)
+   into(/compiled/)
+ // into(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter/)
 }
 
 jar {
