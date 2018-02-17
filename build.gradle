@@ -8,7 +8,7 @@ repositories {
     jcenter()
 }
 dependencies {
-    compile files('myutils.jar')
+     compile files('myutils.jar')
    // compile files(/C:\Users\Sameer\Documents\MEGA\eclipse_workplace\java\MyUtils\myutils.jar/)
    compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
    // compile 'args4j:args4j:2.33'
@@ -17,7 +17,7 @@ dependencies {
   // testCompile 'junit:junit:4.12'
 }
 
-version = 1.83
+version = 2.00
 sourceCompatibility = JavaVersion.VERSION_1_8 
 targetCompatibility = JavaVersion.VERSION_1_8
  
@@ -39,8 +39,7 @@ run {
 
 task copy(type: Copy) {
   from(fileTree("$buildDir/install/${distributions.main.baseName}"))
-   into(/compiled/)
- // into(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter/)
+  into(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter\app/)
 }
 
 jar {

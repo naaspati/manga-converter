@@ -15,7 +15,7 @@ class SamrockManga {
     static List<SamrockManga> loadAll(SamrockDB db) throws SQLException{
         List<SamrockManga> list = new ArrayList<>();
         
-        db.selectAllMangas(rs -> list.add(new SamrockManga(rs)), MANGA_ID, DIR_NAME, LAST_UPDATE_TIME);
+        db.manga().selectAll(rs -> list.add(new SamrockManga(rs)), MANGA_ID, DIR_NAME, LAST_UPDATE_TIME);
         return list;
     }
     

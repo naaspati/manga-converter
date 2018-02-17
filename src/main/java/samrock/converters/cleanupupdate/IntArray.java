@@ -37,4 +37,7 @@ public class IntArray {
     public void forEach(IntConsumer consumer) {
         for (int i : array) consumer.accept(i);
     }
+    public boolean isEmpty() {
+        return array.length == 0;
+    }
 }

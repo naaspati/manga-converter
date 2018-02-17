@@ -15,12 +15,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import sam.console.ansi.ANSI;
+import sam.manga.newsamrock.chapters.ChapterWithMangaId;
+import sam.manga.newsamrock.converter.ConvertChapter;
 import sam.myutils.onmany.OneOrMany;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
@@ -30,49 +32,56 @@ import samrock.converters.extras.Utils;
 import samrock.converters.filechecker.FilesChecker;
 import samrock.converters.filechecker.ResultOrErrors;
 
-public class Converter {
+public class Converter implements MakeStripFinished {
 
     private static final Path BACKUP_DIR = Utils.createBackupFolder(Converter.class);
     private static final Path IMAGES_BACKUP_DIR = BACKUP_DIR.resolve("images_backup");
 
-    private final List<SourceTarget> convertingTasks;
     private final Progressor progress;
-    private final String totalSign;
+    private String totalSign;
     private final List<Errors> errorsList = Collections.synchronizedList(new ArrayList<>());
 
-    public Converter(Collection<SourceTarget> convertingTasks, Progressor progress) {
-        Objects.requireNonNull( convertingTasks);
-        if(convertingTasks.isEmpty())
-            throw new IllegalArgumentException("no convertingTasks found");
-
+    public Converter(Progressor progress) {
         this.progress = progress;
-        this.convertingTasks = new LinkedList<>(convertingTasks);
-        totalSign = " / ".concat(String.valueOf(convertingTasks.size()));
+    }
 
-        if(convertingTasks.isEmpty()){
-            printError("nothing to convert");
-            progress.setFailed();
-            return;
+    public List<ChapterWithMangaId> convert(Collection<ConvertChapter> chapters) {
+        progress.setReset("Checking Dirs");
+        progress.resetProgress();
+        progress.setMaximum(chapters.size());
+
+        List<ConvertTask> list = check(chapters, "CONVERT", ConvertChapter::getSource, ConvertChapter::getTarget);
+
+        if(list == null || list.isEmpty()) {
+            saveErrors();
+            return null;
         }
-    }
-
-    public void convert() {
-        List<ConvertTask> list = check("CONVERT");
-        if(list == null)
-            return;
-
-        start(list);
+        totalSign = " / "+list.size();
+        startConversion(list);
         saveErrors();
+
+        List<ChapterWithMangaId> chs = new LinkedList<>();
+
+        for (ConvertTask ct : list) {
+            OneOrMany<Path> result = ct.getResult();
+            if(result != null && !result.isEmpty()) {
+                ConvertChapter cc = (ConvertChapter) ct.getUserObject();
+                if(result.isSingleValued())
+                    chs.add(new ChapterWithMangaId(cc.getMangaId(), cc.getNumber(), result.getValue().getFileName().toString()));
+                else {
+                    for (Path p : result) 
+                        chs.add(new ChapterWithMangaId(cc.getMangaId(), cc.getNumber(), p.getFileName().toString()));
+                }                
+            }
+        }
+        return chs;
     }
-    private void saveErrors() {
-        Utils.saveErrors(errorsList, BACKUP_DIR.resolve("converting-errors.txt"));
-    }
-    private List<ConvertTask> check(String string) {
+    private <E> List<ConvertTask> check(Collection<E> data, String label, Function<E, Path> sourceGetter, Function<E, Path> targetGetter) {
         try {
-            List<ConvertTask> list = checkDirs();
+            List<ConvertTask> list = checkDirs(data, sourceGetter, targetGetter);
             if(list.isEmpty()) {
-                progress.setReset("NOTHING TO "+string);
-                System.out.println(ANSI.createBanner("NOTHING TO "+string));
+                progress.setReset("NOTHING TO "+label);
+                System.out.println(ANSI.createBanner("NOTHING TO "+label));
                 return null;
             }
             return list;
@@ -83,12 +92,36 @@ public class Converter {
         return null;
     }
 
-    public void move() {
-        List<ConvertTask> list = check("MOVE");
-        if(list == null)
+    private <E> List<ConvertTask> checkDirs(Iterable<E> data, Function<E, Path> sourceGetter, Function<E, Path> targetGetter) throws IOException {
+        List<ConvertTask> list = new ArrayList<>();
+
+        for (E e : data) {
+            progress.increaseBy1();
+            Path src = sourceGetter.apply(e);
+            Path trgt = targetGetter.apply(e);
+
+            ResultOrErrors re = FilesChecker.check(src, trgt);
+
+            if(re.hasErrors()) {
+                errorsList.add(re.getErrors());
+                System.out.println(re.getErrors());
+            }
+            else 
+                list.add(new ConvertTask(src, trgt, re.getFiles(), e));
+        }
+        return list;
+    }
+
+    private void saveErrors() {
+        Utils.saveErrors(errorsList, BACKUP_DIR.resolve("converting-errors.txt"));
+    }
+    public void move(List<SourceTarget> data) throws IOException {
+        List<ConvertTask> list = check(data,  "MOVE", SourceTarget::getSource, SourceTarget::getTarget);
+
+        if(list == null || list.isEmpty())
             return;
 
-        for (SourceTarget st : convertingTasks) {
+        for (ConvertTask st : list) {
             try {
                 if(st.getSource().equals(st.getTarget()) || Files.isSameFile(st.getSource(),st.getTarget()))
                     continue;
@@ -102,68 +135,43 @@ public class Converter {
         progress.setCompleted();
         saveErrors();
     }
-    private List<ConvertTask> checkDirs() throws IOException {
-        progress.setReset("Checking Dirs");
-        progress.resetProgress();
-        progress.setMaximum(convertingTasks.size());
-
-        List<ConvertTask> list = new ArrayList<>();
-
-        for (SourceTarget st : convertingTasks) {
-            progress.increaseBy1();
-
-            ResultOrErrors re = FilesChecker.check(st.getSource(), st.getTarget());
-            if(re.hasErrors()) {
-                errorsList.add(re.getErrors());
-                System.out.println(re.getErrors());
-            }
-            else
-                list.add(new ConvertTask(st, re.getFiles()));
-        }
-        return list;
-    }
-    private void start(List<ConvertTask> tasks) {
+    private void startConversion(List<ConvertTask> tasks) {
         progress.setReset("Converting");
         progress.resetProgress();
         progress.setMaximum(tasks.size());
         progress.setTitle("0 ".concat(totalSign));
 
-        ExecutorService executor = Executors.newFixedThreadPool(4);
-        AtomicBoolean finished = new AtomicBoolean();
+        ExecutorService executor = Utils.runOnExecutorService(tasks.stream().map(t -> new MakeStrip(t, this)).collect(Collectors.toList()));
 
-        progress.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                if(finished.get())
-                    System.exit(0);
+        if(executor != null) {
+            AtomicBoolean finished = new AtomicBoolean();
 
-                MakeStrip.CANCEL.set(true);
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e1) {}
-                executor.shutdownNow();
-                while(!executor.isTerminated()) {}
-            }
-        });
+            progress.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosing(WindowEvent e) {
+                    if(finished.get())
+                        return;
 
-        ConverterFinish finisher = this::progress;
-        tasks.stream()
-        .map(temp -> new MakeStrip(temp, finisher))
-        .forEach(executor::execute);
-
-        executor.shutdown();
-        
-        while(!executor.isTerminated()) {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e1) {}
+                    MakeStrip.CANCEL.set(true);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e1) {}
+                    executor.shutdownNow();
+                    while(!executor.isTerminated()) {}
+                }
+            });
+            Utils.shutdownAndWait(executor);
+            finished.set(true);
         }
-
         progress.setCompleted();
-        finished.set(true);
     }
 
-    private void progress(Errors errors, ConvertTask task, OneOrMany<Path> convertedFiles) {
+    @Override
+    public void finish(MakeStrip mtask) {
+        Errors errors = mtask.getErrors();
+        OneOrMany<Path> convertedFiles = mtask.getConvertedFiles();
+        ConvertTask task = mtask.getTask();
+
         synchronized(progress) {
             progress.setString("Converted: "+errors.getSubpath());
             progress.setTitle(progress.getCurrentProgress() + totalSign);
@@ -171,16 +179,18 @@ public class Converter {
         }
 
         if(!errors.hasError() && !convertedFiles.isEmpty()){
-            if(convertedFiles.isSingleValued())
-                move(convertedFiles.getValue(), task.getTarget().resolveSibling(task.getTarget().getFileName()+".jpeg"), errors);
+            OneOrMany<Path> result = new OneOrMany<>();
+            if(convertedFiles.isSingleValued()) 
+                result.add(move(convertedFiles.getValue(), task.getTarget().resolveSibling(task.getTarget().getFileName()+".jpeg"), errors));
             else {
                 int n = 1; 
                 for (Path p : convertedFiles.getValues())
-                    move(p, task.getTarget().resolveSibling(task.getTarget().getFileName()+" - "+(n++)+".jpeg"), errors);    
+                    result.add(move(p, task.getTarget().resolveSibling(task.getTarget().getFileName()+" - "+(n++)+".jpeg"), errors));    
             }
             if(!errors.hasError()) {
                 try {
                     backup(task.getSource());
+                    task.setResult(result);
                 } catch (IOException e) {
                     errors.addGeneralError(e, "failed to move to backup: ",task.getSource());
                 }
@@ -191,19 +201,21 @@ public class Converter {
             System.out.println(errors.getSubpath()+"\n"+errors);
         }
     }
-    private void move(Path src, Path target, Errors errors) {
+    private Path move(Path src, Path target, Errors errors) {
         try {
             Path backup = backup(target);
-            errors.addGarbagedError(Utils.subpath(target), Utils.subpath(backup));
+            if(backup != null)
+                errors.addGarbagedError(Utils.subpath(target), Utils.subpath(backup));
         } catch (IOException e) {
             errors.addMoveFailed(e, "Failed to garbage", target);
-            return;
+            return null;
         }
         try {
-            Files.move(src, target, StandardCopyOption.REPLACE_EXISTING);
+            return  Files.move(src, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             errors.addMoveFailed(e, "Failed to move", "src: ", src, " | target: ",target);
         }
+        return null;
     }
     private Path backup(Path p) throws IOException {
         return Utils.backupMove(p, IMAGES_BACKUP_DIR);

@@ -1,7 +1,6 @@
 package samrock.converters.cleanupupdate;
 
 import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static sam.console.ansi.ANSI.green;
@@ -50,11 +49,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Formatter;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,14 +62,18 @@ import sam.manga.newsamrock.MangaTools;
 import sam.manga.newsamrock.SamrockDB;
 import sam.manga.newsamrock.chapters.Chapter;
 import sam.manga.newsamrock.chapters.ChapterWithMangaId;
-import sam.manga.newsamrock.converter.ConvertChapter;
+import sam.manga.newsamrock.chapters.ChaptersMeta;
 import sam.manga.newsamrock.thumb.ThumbUtils;
 import sam.manga.newsamrock.thumb.ThumbUtils.ExtraAndMissing;
+import sam.properties.myconfig.MyConfig;
+import sam.tsv.Tsv;
 import samrock.converters.extras.Progressor;
+import samrock.converters.extras.Utils;
 import samrock.converters.mangarock.MangarockDB;
 import samrock.converters.mangarock.MangarockManga;
 
 public class CheckupsAndUpdates {
+    private final Path BACKUP_PATH = Utils.createBackupFolder(CheckupsAndUpdates.class);
     private final String coloredStart = "\u001b[94;102m Start \u001b[0m";
     private final String coloredEnd = "\u001b[94;102m End \u001b[0m\r\n";
 
@@ -80,26 +81,15 @@ public class CheckupsAndUpdates {
     private final IntArray mangaIds;
     private final Progressor progressor;
     private final List<Integer> mangasToUpdate = new ArrayList<>();
-    
-    private final  Map<Integer, List<ChapterWithMangaId>> chaptersData;
+    private final  List<ChapterWithMangaId> chaptersData;
 
-    public CheckupsAndUpdates(Collection<Integer> mangaIds, Progressor progressor) {
-        if(mangaIds == null || mangaIds.isEmpty())
-            throw new IllegalArgumentException("no mangaIds specified: "+mangaIds);
+    public CheckupsAndUpdates(List<ChapterWithMangaId> chaptersData, Progressor progressor) {
+        if(chaptersData == null || chaptersData.isEmpty())
+            throw new IllegalArgumentException("no mangaIds specified: "+chaptersData);
 
-        this.mangaIds = new IntArray(mangaIds.stream().mapToInt(Integer::intValue).sorted().distinct().toArray());
+        this.mangaIds = new IntArray(chaptersData.stream().mapToInt(ChapterWithMangaId::getMangaId).sorted().distinct().toArray());
         this.progressor = progressor;
-        chaptersData = new HashMap<>();
-    }
-
-    public CheckupsAndUpdates(List<ConvertChapter> chapters, Progressor progress) {
-        if(chapters == null || chapters.isEmpty())
-            throw new IllegalArgumentException("no chapters specified: "+chapters);
-        
-        chaptersData = chapters.stream().collect(groupingBy(ConvertChapter::getMangaId, mapping(c -> new ChapterWithMangaId(c.getMangaId(), c.getNumber(), c.getName()), toList())));
-        
-        this.mangaIds = new IntArray(chapters.stream().mapToInt(ConvertChapter::getMangaId).sorted().distinct().toArray());
-        this.progressor = progress;
+        this.chaptersData = chaptersData;
     }
     public boolean start(){
         progressor.setExitOnClose(false);
@@ -138,20 +128,23 @@ public class CheckupsAndUpdates {
             final IntArray newMangaIds = new IntArray(newIds, newIndex);
             final IntArray oldMangaIds = new IntArray(oldIds, oldIndex);
 
-            if(newIds != null) {
+            if(newIndex != 0) {
                 progressor.setTitle("proceessing New Mangas");
                 processNewMangas(samrock, mangarock, newMangaIds);    
             }
             progressor.increaseBy1();
 
-            if(oldIds != null) {
+            if(oldIndex != 0) {
                 progressor.setTitle("Processing modified chapters");
                 updateOrDeleteMangas(samrock, mangarock, oldMangaIds, newMangaIds, allSamrockMangas);                
             }
             progressor.increaseBy1();
 
-            progressor.setTitle("performing total Update");
-            performTotalUpdate(samrock, mangarock, allSamrockMangas);
+            if(!mangarock.getPath().equals(MyConfig.MANGAROCK_DB_BACKUP)) {
+                progressor.setTitle("performing total Update");
+                performTotalUpdate(samrock, mangarock, allSamrockMangas);
+            }
+            
             progressor.increaseBy1();
 
             //report manga not listed in database
@@ -161,12 +154,23 @@ public class CheckupsAndUpdates {
 
             samrock.commit();
             if(!mangasToUpdate.isEmpty()) {
-                samrock.updateChaptersOfMangas(mangasToUpdate, chaptersData);
+                Tsv tsv = new Tsv(ChaptersMeta.MANGA_ID, ChaptersMeta.NUMBER, ChaptersMeta.NAME);
+                chaptersData.sort(Comparator.comparing(ChapterWithMangaId::getMangaId).thenComparing(ChapterWithMangaId::getNumber));
+                
+                for (ChapterWithMangaId c : chaptersData)
+                    tsv.addRow(String.valueOf(c.getMangaId()), String.valueOf(c.getNumber()), c.getFileName());
+                
+                tsv.save(BACKUP_PATH.resolve("chapters-data-"+LocalDateTime.now().toString().replace(':', '_').replace('.', '_').replace('T', '[')+"].tsv"));
+                
+                int length = Utils.LOGS.length();
+                samrock.chapter().updateChaptersInDB(chaptersData, mangasToUpdate, Utils.LOGS);
+                System.out.println(Utils.LOGS.substring(length));
+                System.out.println();
                 samrock.commit();
             }
             //preparing mangalist
             progressor.setTitle("Preparing manga lists");
-            preparingMangalist(samrock);
+            //TODO preparingMangalist(samrock);
             progressor.increaseBy1();
         } catch (Exception e) {
             printError(e, "Cleanups AND updates Error");
@@ -219,12 +223,15 @@ public class CheckupsAndUpdates {
         println(coloredEnd);
     }
     private void processNewMangas(SamrockDB samrock, MangarockDB mangarock, IntArray array) throws SQLException, IOException {
+        if(array.isEmpty())
+            return;
+        
         println(coloredMsgMaker("Processing new Mangas: ")+coloredStart);
 
         String format1 = "  %-10s%s\n";
         print(green(String.format(format1, "manga_id", "manga_name")));
 
-        List<MangarockManga> list =  MangarockManga.getMangas(mangarock, array.toArray());
+        List<MangarockManga> list =  mangarock.getMangas(array.toArray());
 
         if(list.size() != array.length()) {
             println(red("manga_ids not found in mangarock"));
@@ -273,13 +280,13 @@ public class CheckupsAndUpdates {
         });
 
         println();
-        println(yellow("Found: " +array+", execute: "+executes));
+        println(yellow("Found: " +array.length()+", execute: "+executes));
         println();
         println(coloredEnd);
     }
 
     private void updateOrDeleteMangas(SamrockDB samrock, MangarockDB mangarock, IntArray oldMangaIds, IntArray newMangaIds, List<SamrockManga> allSamrockMangas) throws SQLException {
-        println(coloredMsgMaker("Checking old Mangas: ")+coloredStart);
+        println(coloredMsgMaker("Checking Updated Mangas: ")+coloredStart);
 
         List<SamrockManga> deleteQueue = new ArrayList<>();
         Path manga_folder = Paths.get(MANGA_FOLDER);
@@ -312,10 +319,9 @@ public class CheckupsAndUpdates {
         println(coloredEnd);
     }
     private void performTotalUpdate(SamrockDB samrock, MangarockDB mangarock, List<SamrockManga> allSamrockMangas) throws SQLException {
-        println(coloredMsgMaker("samrock values update from mangarock: ")+coloredStart);
+        println(coloredMsgMaker("Total updates: ")+coloredStart);
 
-
-        List<MangarockManga> mangas = MangarockManga.getMangas(mangarock, allSamrockMangas.stream().mapToInt(SamrockManga::getMangaId).toArray() , " AND last_view IS NOT 0");
+        List<MangarockManga> mangas = mangarock.getMangas(allSamrockMangas.stream().mapToInt(SamrockManga::getMangaId).toArray() , " AND last_view IS NOT 0");
 
         String format = qm().update(TABLE_NAME).placeholders("%s").where(w -> w.eq(MANGA_ID, "?", false)).build();
 
@@ -442,22 +448,22 @@ public class CheckupsAndUpdates {
     }
 
     private void preparingMangalist(SamrockDB samrock) throws SQLException {
-        Map<Integer, Chapter> lastChaps = samrock.getAllLastChapters();
+        Map<Integer, Chapter> lastChaps = samrock.chapter().getAllLastChapters();
         List<ListManga> data = new ArrayList<>(lastChaps.size());
 
-        samrock.selectAllMangas(rs -> {
+        samrock.manga().selectAll(rs -> {
             int id = rs.getInt(MANGA_ID);
             data.add(new ListManga(rs.getInt(CHAP_COUNT_PC), rs.getString(MANGA_NAME), rs.getLong(LAST_UPDATE_TIME), lastChaps.get(id)));
         }, MANGA_ID, MANGA_NAME, CHAP_COUNT_PC, LAST_UPDATE_TIME);
 
-        TreeMap<Character, List<ListManga>> mapAlphabetic = new TreeMap<>(data.stream().collect(groupingBy(manga -> {
+        TreeMap<Object, List<ListManga>> mapAlphabetic = data.stream().collect(groupingBy(manga -> {
             char c1 = Character.toUpperCase(manga.manga_name.charAt(0));
 
             if(Character.isAlphabetic(c1))
                 return c1;
             else
                 return '#';
-        })));
+        }, TreeMap::new, toList()));
 
         TreeMap<LocalDate, List<ListManga>> mapTime = new TreeMap<>(Comparator.reverseOrder());
         ZoneOffset zoneOffset = ZoneOffset.of("+05:30");

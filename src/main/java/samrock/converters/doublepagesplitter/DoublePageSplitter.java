@@ -32,7 +32,6 @@ import sam.console.ansi.ANSI;
 import sam.console.ansi.ANSI.FOREGROUND;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
-import samrock.converters.extras.SourceTarget;
 import samrock.converters.extras.Utils;
 import samrock.converters.filechecker.CheckedFile;
 import samrock.converters.filechecker.FilesChecker;
@@ -55,7 +54,7 @@ public class DoublePageSplitter implements Runnable {
         if(re.hasErrors())
             System.out.println(re.getErrors());
         else
-            new DoublePageSplitter(new ConvertTask(p,p, re.getFiles()));
+            new DoublePageSplitter(new ConvertTask(p, re.getFiles()));
     }
 
     public static void batchFolderSplitting() throws IOException{
@@ -74,7 +73,7 @@ public class DoublePageSplitter implements Runnable {
                     Path p = f.toPath();
                     ResultOrErrors re = FilesChecker.check(p, null); 
                     if(re.getErrors() == null)
-                        tasks.add(new ConvertTask(new SourceTarget(p, p), re.getFiles()));
+                        tasks.add(new ConvertTask(p, re.getFiles()));
                     else
                         errors.add(re.getErrors());
                 }

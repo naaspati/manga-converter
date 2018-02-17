@@ -2,6 +2,7 @@ package samrock.converters.app.main;
 import static sam.console.ansi.ANSI.yellow;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.Comparator;
 import java.util.Formatter;
 import java.util.List;
@@ -34,18 +35,7 @@ public class App {
 
     @Parameter
     List<String> argsList;
-
-    //TODO move to samrock tools
-    /*
-     * @Parameter(names= {"-cmi", "--changeMangaId"},description = "this will make required changes, in databases and files required transition in old manga_id to new manga_id")
-    public boolean changeMangaId;
-     */
-
-
-
-    //TODO move to samrock tools
-    // -add      --add-new-manga                      add new manga manually
-
+    
     public static void main(String[] args) throws IOException {
         if(args.length == 1 && (args[0].equals("-v") || args[0].equals("--version"))) {
             System.out.println(VERSION);
@@ -100,6 +90,10 @@ public class App {
                 return;
             }
             try {
+                System.out.println(yellow("\nJVM PARAMETERS"));
+                ManagementFactory.getRuntimeMXBean().getInputArguments().forEach(s -> System.out.println("\t"+s));
+                System.out.println();
+                
                 ConvertProcessor.process(Utils.CHAPTERS_DATA_FILE, c.mangarockMoveOnly);
             } catch (IOException e) {
                 SwingUtils.showErrorDialog("Error with conversion", e);

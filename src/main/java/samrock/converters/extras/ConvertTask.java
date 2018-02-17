@@ -2,31 +2,46 @@ package samrock.converters.extras;
 
 import java.nio.file.Path;
 
-import samrock.converters.extras.SourceTarget;
+import sam.myutils.onmany.OneOrMany;
 import samrock.converters.filechecker.CheckedFile;
 
 public class ConvertTask {
+    private final Object userObject;
+    
+    private final CheckedFile[] files;
     private final Path source;
     private final Path target;
-    private final CheckedFile[] files;
     
-    public ConvertTask(Path source, Path target, CheckedFile[] files) {
+    private OneOrMany<Path> result;
+    
+    public ConvertTask(Path source, Path target, CheckedFile[] files, Object userObject) {
+        this.userObject = userObject;
+        this.files = files;
         this.source = source;
         this.target = target;
-        this.files = files;
     }
-    public ConvertTask(SourceTarget st, CheckedFile[] files) {
-        this.source = st.getSource();
-        this.target = st.getTarget();
+    public ConvertTask(Path source, CheckedFile[] files) {
+        this.source = source;
+        this.target = null;
         this.files = files;
+        this.userObject = null;
     }
-    public Path getSource() {
-        return source;
+    public Object getUserObject() {
+        return userObject;
+    }
+    public CheckedFile[] getFiles() {
+        return files;
     }
     public Path getTarget() {
         return target;
     }
-    public CheckedFile[] getFiles() {
-        return files;
+    public Path getSource() {
+        return source;
+    }
+    public OneOrMany<Path> getResult() {
+        return result;
+    }
+    public void setResult(OneOrMany<Path> result) {
+        this.result = result;
     }
 }

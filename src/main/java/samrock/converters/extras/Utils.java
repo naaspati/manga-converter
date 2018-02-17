@@ -1,8 +1,11 @@
 package samrock.converters.extras;
 
 import static java.lang.System.getProperty;
-import static sam.console.ansi.ANSI.*;
+import static sam.console.ansi.ANSI.green;
+import static sam.console.ansi.ANSI.red;
+import static sam.console.ansi.ANSI.yellow;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -12,6 +15,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Month;
 import java.util.Arrays;
 import java.util.Collection;
@@ -45,7 +49,7 @@ public class Utils {
     public static final Path DATA_FOLDER = Paths.get(MyConfig.MANGA_DATA_FOLDER);
 
     public static final int MANGA_FOLDER_NAMECOUNT = MANGA_FOLDER.getNameCount();
-    private static final StringBuilder LOGS = new StringBuilder();
+    public static final StringBuilder LOGS = new StringBuilder();
 
     public static final Path CHAPTERS_DATA_FILE;
     public final static int THREAD_COUNT = 4;
@@ -92,6 +96,7 @@ public class Utils {
             }
             CHAPTERS_DATA_FILE = p;
         }
+        
         MAX_FILE_NUMBER = Integer.parseInt(getProperty("MAX_FILE_NUMBER"));
         DONT_SKIP_DOUBLE_PAGE_CHECK = !getProperty("SKIP_DOUBLE_PAGE_CHECK").equalsIgnoreCase("true"); 
         DONT_SKIP_NUMBER_MISSINGS_CHECK = !getProperty("SKIP_NUMBER_MISSINGS_CHECK").equalsIgnoreCase("true");
@@ -106,9 +111,29 @@ public class Utils {
         System.out.println("SKIP_NUMBER_MISSINGS_CHECK: "+c.apply(DONT_SKIP_NUMBER_MISSINGS_CHECK));
         System.out.println("SKIP_PAGE_SIZE_CHECK: "+c.apply(DONT_SKIP_PAGE_SIZE_CHECK));
         System.out.println("SKIP_FISHY_CHECK: "+c.apply(DONT_SKIP_FISHY_CHECK));
-
-
-        //TODO check value is properly set
+        
+        Runtime.getRuntime().addShutdownHook(new Thread(Utils::finish));
+    }
+    
+    private static void finish() {
+        Path p = createBackupFolder(Utils.class).resolve(LocalDateTime.now().toString().replace("T", " [").replace(':', '.')+"].txt");
+        try {
+            Files.write(p, LOGS.toString().getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            System.out.println(red("failed to write: ")+p);
+            e.printStackTrace();
+        }
+        if(Files.exists(APP_DATA)) {
+            try {
+                Files.walk(APP_DATA)
+                .filter(Files::isDirectory)
+                .sorted((f1, f2) -> Integer.compare(f2.getNameCount(), f1.getNameCount()))
+                .map(Path::toFile)
+                .forEach(File::delete);
+            } catch (IOException e) {}
+        }
+        System.out.println(yellow("\nfinished"));
+        
     }
 
     public static QueryMaker qm() {
@@ -286,9 +311,9 @@ public class Utils {
         else {
             ExecutorService ex = Executors.newFixedThreadPool(tasks.size() <  THREAD_COUNT ? tasks.size() : THREAD_COUNT);
 
-            for (Runnable p : tasks) {
+            for (Runnable p : tasks)
                 ex.execute(p);
-            }
+            
             return ex;
         }
         return null;

@@ -47,7 +47,7 @@ public class MakeStrip implements Runnable {
     }
 
     private final ConvertTask task;
-    private final ConverterFinish finish;
+    private final MakeStripFinished finish;
     private Errors errors;
     private OneOrMany<Path> convertedFiles;
 
@@ -57,12 +57,19 @@ public class MakeStrip implements Runnable {
      * @param f
      * @throws IOException
      */
-    public MakeStrip(ConvertTask task, ConverterFinish finish) {
+    public MakeStrip(ConvertTask task, MakeStripFinished finish) {
         Objects.requireNonNull(task);
         Objects.requireNonNull(finish);
 
         this.task = task;
         this.finish = finish;
+    }
+    
+    public OneOrMany<Path> getConvertedFiles() {
+        return convertedFiles;
+    }
+    public ConvertTask getTask() {
+        return task;
     }
 
     @Override
@@ -75,13 +82,13 @@ public class MakeStrip implements Runnable {
         try {
             start();
         } catch (NullPointerException|OutOfMemoryError e) {
-            errors.addGeneralError(e, "Error while converting");
+            getErrors().addGeneralError(e, "Error while converting");
         }
 
         if(CANCEL.get())
-            errors.setCancelled();
+            getErrors().setCancelled();
 
-        finish.finish(errors, task, convertedFiles);
+        finish.finish(this);
     }
     private boolean imageError = false;
     ArrayList<BufferedImage> images;
@@ -126,7 +133,7 @@ public class MakeStrip implements Runnable {
                 currentHeight += h;
 
                 if(DONT_SKIP_PAGE_SIZE_CHECK && (w < 100 || h < 100)){
-                    errors.addImageSizeError(path.subpath(path.getNameCount() - 2, path.getNameCount()), w, h);
+                    getErrors().addImageSizeError(path.subpath(path.getNameCount() - 2, path.getNameCount()), w, h);
                     setImageError(); 
                 }
                 if(DONT_SKIP_DOUBLE_PAGE_CHECK && w > 1000)
@@ -138,7 +145,7 @@ public class MakeStrip implements Runnable {
                     currentHeight = h;
                 }
             } catch (IOException|NullPointerException|IllegalArgumentException e) {
-                errors.addImageError(e, "Image Error", path.subpath(path.getNameCount() - 2, path.getNameCount()));
+                getErrors().addImageError(e, "Image Error", path.subpath(path.getNameCount() - 2, path.getNameCount()));
                 setImageError();
             }
         }
@@ -146,7 +153,7 @@ public class MakeStrip implements Runnable {
         int doublePageCount = doublePages == null ? 0 : doublePages.size();
 
         if(doublePageCount > 0  && doublePageCount > task.getFiles().length  - task.getFiles().length/4){
-            errors.addDoublePagesError(doublePages);
+            getErrors().addDoublePagesError(doublePages);
             return;
         }
         if(!imageError && !images.isEmpty())
@@ -178,7 +185,7 @@ public class MakeStrip implements Runnable {
         try {
             temp = Files.createTempFile(TEMP_DIR, task.getSource().getFileName().toString(), null);
         } catch (IOException e) {
-            errors.addImageError(e, "failed to create temp file: ", task.getSource().getFileName());
+            getErrors().addImageError(e, "failed to create temp file: ", task.getSource().getFileName());
             return null;
         }
 
@@ -197,8 +204,12 @@ public class MakeStrip implements Runnable {
             ImageIO.write(finalImage, "jpeg", os);
             return temp;
         } catch (IOException e) {
-            errors.addImageError(e, "Unable to save Image");
+            getErrors().addImageError(e, "Unable to save Image");
         }
         return null;
+    }
+
+    public Errors getErrors() {
+        return errors;
     }
 }
