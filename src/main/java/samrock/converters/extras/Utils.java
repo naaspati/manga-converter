@@ -133,7 +133,6 @@ public class Utils {
             } catch (IOException e) {}
         }
         System.out.println(yellow("\nfinished"));
-        
     }
 
     public static QueryMaker qm() {

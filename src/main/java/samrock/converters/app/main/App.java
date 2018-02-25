@@ -1,22 +1,39 @@
 package samrock.converters.app.main;
 import static sam.console.ansi.ANSI.yellow;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Formatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.swing.JOptionPane;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 
 import sam.console.ansi.ANSI;
+import sam.manga.newsamrock.SamrockDB;
+import sam.manga.newsamrock.chapters.Chapter;
+import sam.manga.newsamrock.converter.ConvertChapter;
+import sam.manga.newsamrock.mangas.MangasMeta;
 import sam.swing.utils.SwingUtils;
 import samrock.converters.extras.Utils;
 import samrock.converters.makestrip.ConvertProcessor;
 
 public class App {
-    static final double VERSION = 2.00;
+    static final double VERSION = 2.001;
 
     @Parameter(names= {"-h", "--help"},description = "print this", help=true, order=0)
     public boolean help;
@@ -35,7 +52,7 @@ public class App {
 
     @Parameter
     List<String> argsList;
-    
+
     public static void main(String[] args) throws IOException {
         if(args.length == 1 && (args[0].equals("-v") || args[0].equals("--version"))) {
             System.out.println(VERSION);
@@ -47,11 +64,9 @@ public class App {
             e.printStackTrace();
         }
     }
+
     public App(String[] args) {
-        JCommander jc = JCommander.newBuilder()
-                .programName("conv")
-                .addObject(this).build();
-        jc.parse(args);
+        JCommander jc = parse(this, "conv", args);
 
         if(!(convert || split || utils)) {
             System.out.println(yellow("no options specified"));
@@ -65,10 +80,91 @@ public class App {
             jc = check(c, "conv --split [file]");
         }
         else if(utils) {
-            Utils2 c = new Utils2();
-            jc = check(c, "conv --utils ");
+            Utils2 uti = new Utils2();
+            jc = check(uti, "conv --utils ");
+            if(jc == null)
+                return;
+
+            if(uti.checkFoldersNotConverted)
+                checkFoldersNotConverted(uti);
         }
     }
+    private void checkFoldersNotConverted(Utils2 uti) {
+        Path path = Paths.get("app_data/modifiedDates.tsv");
+        HashMap<String, Long> modifiedDates =  new HashMap<>();
+
+        try {
+            Files.lines(path, StandardCharsets.UTF_16)
+            .forEach(s -> {
+                int i = s.indexOf('\t');
+                if(i < 0)
+                    return;
+                modifiedDates.put(s.substring(0, i), Long.parseLong(s.substring(i+1)));
+            });
+        } catch (IOException e) {
+            SwingUtils.showErrorDialog("failed reading: "+path, e);
+            return;
+        }    
+
+        List<File> files = ConvertProcessor.checkfoldersNotConverted(modifiedDates);
+
+        if(files != null && !files.isEmpty()) {
+            System.out.println("\n");
+
+            Convert c = new Convert();
+            if(uti.args != null && !uti.args.isEmpty())
+                parse(c, "conv", uti.args);
+
+            if(JOptionPane.showConfirmDialog(null, "Wanna convert") != JOptionPane.YES_OPTION)
+                return;
+
+            Path p = Utils.APP_DATA; //initiating Utils;
+
+            HashMap<String, Integer> dirnameMangaIdMap = new HashMap<>();
+            Map<String, List<File>> filesMap = files.stream().collect(Collectors.groupingBy(f -> f.getParentFile().getName()));
+
+            try(SamrockDB db = new SamrockDB()) {
+                db.manga().selectAll(rs -> {
+                    String dirname = MangasMeta.getDirName(rs);
+                    if(filesMap.containsKey(dirname))
+                        dirnameMangaIdMap.put(dirname, MangasMeta.getMangaId(rs));
+                }, MangasMeta.MANGA_ID, MangasMeta.DIR_NAME);
+            } catch (SQLException | InstantiationException | IllegalAccessException | ClassNotFoundException | IOException e) {
+                SwingUtils.showErrorDialog("failed to load samrockdb", e);
+                return;
+            }
+            
+            List<ConvertChapter> list = new ArrayList<>();
+            filesMap.forEach((dirname, filelist) -> {
+                int id = dirnameMangaIdMap.get(dirname);
+                for (File f : filelist) {
+                    String name = f.getName();
+                    Path filePath = f.toPath();
+                    list.add(new ConvertChapter(id, Chapter.parseChapterNumber(name), name, filePath, filePath));
+                }
+            });
+            try {
+                ConvertProcessor.process(list, false);
+            } catch (IOException e) {
+                SwingUtils.showErrorDialog("failed conversion", e);
+                return;
+            }
+        }
+        if(files != null) {
+            StringBuilder sb = new StringBuilder();
+            modifiedDates.forEach((s,t) -> sb.append(s).append('\t').append(t).append('\n'));
+            sb.setLength(sb.length() - 1);
+
+            try {
+                Files.write(path, sb.toString().getBytes(StandardCharsets.UTF_16), StandardOpenOption.TRUNCATE_EXISTING);
+            } catch (IOException e) {
+                System.out.println("failed to save: "+path);
+                e.printStackTrace();
+            }
+        }
+
+    }
+
     private void convertCmd() {
         Convert c = new Convert();
         if(help || (argsList == null && c.tempChapter == null)) {
@@ -93,7 +189,7 @@ public class App {
                 System.out.println(yellow("\nJVM PARAMETERS"));
                 ManagementFactory.getRuntimeMXBean().getInputArguments().forEach(s -> System.out.println("\t"+s));
                 System.out.println();
-                
+
                 ConvertProcessor.process(Utils.CHAPTERS_DATA_FILE, c.mangarockMoveOnly);
             } catch (IOException e) {
                 SwingUtils.showErrorDialog("Error with conversion", e);
@@ -101,18 +197,29 @@ public class App {
         }
     }
     private JCommander check(Object obj, String programName) {
+        if(help || argsList == null || argsList.isEmpty()) {
+            printUsage(parse(obj, programName, "-h"));
+            return null;
+        } else {
+            JCommander jc = parse(obj, programName, argsList);
+            printUsage(jc);
+            return jc;
+        } 
+    }
+
+    private JCommander parse(Object obj, String programName, List<String> args){
+        return parse(obj, programName, args == null ? null : args.toArray(new String[args.size()]));
+    }
+    private JCommander parse(Object obj, String programName, String...args){
         JCommander jc = JCommander.newBuilder()
                 .programName(programName)
                 .addObject(obj).build();
 
-        if(help || argsList == null || argsList.isEmpty()) {
-            jc.parse("-h");
-            printUsage(jc);
-            return null;
-        } else 
-            jc.parse(argsList.toArray(new String[argsList.size()]));
+        if(args != null)
+            jc.parse(args);
         return jc;
     }
+
     private void printUsage(JCommander jc) {
         StringBuilder sb = new StringBuilder();
         Formatter fm = new Formatter(sb);

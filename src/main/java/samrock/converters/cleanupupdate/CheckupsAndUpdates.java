@@ -58,11 +58,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Stream;
 
-import sam.manga.newsamrock.MangaTools;
 import sam.manga.newsamrock.SamrockDB;
 import sam.manga.newsamrock.chapters.Chapter;
 import sam.manga.newsamrock.chapters.ChapterWithMangaId;
 import sam.manga.newsamrock.chapters.ChaptersMeta;
+import sam.manga.newsamrock.mangas.MangaUtils;
 import sam.manga.newsamrock.thumb.ThumbUtils;
 import sam.manga.newsamrock.thumb.ThumbUtils.ExtraAndMissing;
 import sam.properties.myconfig.MyConfig;
@@ -265,7 +265,7 @@ public class CheckupsAndUpdates {
         int executes = samrock.prepareStatementBlock(sql, ps ->{
             for (MangarockManga m : list) {
                 ps.setInt(1, m.getMangaId());
-                ps.setString(2, MangaTools.formatMangaDirName(m.getName()));
+                ps.setString(2, MangaUtils.toDirName(m.getName()));
                 ps.setString(3, m.getName());
                 ps.setString(4, m.getAuthor());
                 ps.setString(5, m.getDescription());

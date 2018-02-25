@@ -37,7 +37,7 @@ run {
   */
 }
 
-task copy(type: Copy) {
+task copy(type: Copy, dependsOn:'installDist') { 
   from(fileTree("$buildDir/install/${distributions.main.baseName}"))
   into(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter\app/)
 }

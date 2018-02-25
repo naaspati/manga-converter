@@ -24,7 +24,7 @@ public class FilesChecker {
             return new ResultOrErrors(Errors.generalErrors(Files.notExists(src) ? "Folder not found: " : "not a folder: ", src));
 
         checkBadDir(src);
-        if(target != null && !target.equals(src))
+        if(target != null && !target.equals(src) && Files.exists(target))
             checkBadDir(target);
 
         return checkDir(src);
