@@ -64,6 +64,10 @@ public class MangarockManga {
     public int getRank() {
         return rank;
     }
-
-    
+	@Override
+	public String toString() {
+		return "MangarockManga [author=" + author + ", categories=" + categories + ", description=" + description
+				+ ", name=" + name + ", totalChapters=" + totalChapters + ", lastUpdate=" + lastUpdate + ", _id=" + _id
+				+ ", status=" + status + ", rank=" + rank + "]";
+	}
 }

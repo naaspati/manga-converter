@@ -1,9 +1,10 @@
 package samrock.converters.makestrip;
 
-import static samrock.converters.extras.Utils.printError;
-import static samrock.converters.extras.Utils.println;
+import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 import static samrock.converters.extras.Utils.subpath;
 
+import java.awt.EventQueue;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
@@ -15,15 +16,18 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.logging.Logger;
 
-import sam.console.ansi.ANSI;
+import sam.collection.OneOrMany;
+import sam.console.ANSI;
 import sam.manga.newsamrock.chapters.ChapterWithMangaId;
 import sam.manga.newsamrock.converter.ConvertChapter;
-import sam.myutils.onmany.OneOrMany;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
 import samrock.converters.extras.Progressor;
@@ -32,7 +36,7 @@ import samrock.converters.extras.Utils;
 import samrock.converters.filechecker.FilesChecker;
 import samrock.converters.filechecker.ResultOrErrors;
 
-public class Converter implements MakeStripFinished {
+public class Converter {
 
     private static final Path BACKUP_DIR = Utils.createBackupFolder(Converter.class);
     private static final Path IMAGES_BACKUP_DIR = BACKUP_DIR.resolve("images_backup");
@@ -40,6 +44,7 @@ public class Converter implements MakeStripFinished {
     private final Progressor progress;
     private String totalSign;
     private final List<Errors> errorsList = Collections.synchronizedList(new ArrayList<>());
+    private final Logger logger = Logger.getLogger(Converter.class.getSimpleName());
 
     public Converter(Progressor progress) {
         this.progress = progress;
@@ -81,13 +86,12 @@ public class Converter implements MakeStripFinished {
             List<ConvertTask> list = checkDirs(data, sourceGetter, targetGetter);
             if(list.isEmpty()) {
                 progress.setReset("NOTHING TO "+label);
-                System.out.println(ANSI.createBanner("NOTHING TO "+label));
+                logger.info(ANSI.createBanner("NOTHING TO "+label));
                 return null;
             }
             return list;
         } catch (IOException e) {
-            System.out.println("Failed checkDirs()");
-            e.printStackTrace();
+            logger.log(WARNING, "Failed checkDirs()", e);
         }
         return null;
     }
@@ -104,7 +108,7 @@ public class Converter implements MakeStripFinished {
 
             if(re.hasErrors()) {
                 errorsList.add(re.getErrors());
-                System.out.println(re.getErrors());
+                logger.info(re.getErrors().toString());
             }
             else 
                 list.add(new ConvertTask(src, trgt, re.getFiles(), e));
@@ -127,9 +131,9 @@ public class Converter implements MakeStripFinished {
                     continue;
                 backup(st.getTarget());
                 Files.move(st.getSource(), st.getTarget());
-                println("moved: ",subpath(st.getSource())," -> ",subpath(st.getTarget()));
+                logger.info("moved: " + subpath(st.getSource()) + ANSI.yellow(" -> ") +subpath(st.getTarget()));
             } catch (IOException e) {
-                printError(e, "failed to move: "+st);
+                logger.log(SEVERE, "failed to move: "+st, e);
             }
         }
         progress.setCompleted();
@@ -140,85 +144,115 @@ public class Converter implements MakeStripFinished {
         progress.resetProgress();
         progress.setMaximum(tasks.size());
         progress.setTitle("0 ".concat(totalSign));
+        
+        if(tasks.isEmpty()) {
+            logger.info(ANSI.green("nothing to convert"));
+            progress.setCompleted();
+            return;
+        }
+        
+        int nThreads = tasks.size() <  Utils.THREAD_COUNT ? tasks.size() : Utils.THREAD_COUNT;
+        
+        ThreadPool pool = new ThreadPool(nThreads);
+        tasks.forEach(c -> pool.submit(new MakeStrip(c)));
 
-        ExecutorService executor = Utils.runOnExecutorService(tasks.stream().map(t -> new MakeStrip(t, this)).collect(Collectors.toList()));
+        progress.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if(pool.isTerminated())
+                    return;
 
-        if(executor != null) {
-            AtomicBoolean finished = new AtomicBoolean();
-
-            progress.addWindowListener(new WindowAdapter() {
-                @Override
-                public void windowClosing(WindowEvent e) {
-                    if(finished.get())
-                        return;
-
-                    MakeStrip.CANCEL.set(true);
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e1) {}
-                    executor.shutdownNow();
-                    while(!executor.isTerminated()) {}
-                }
-            });
-            Utils.shutdownAndWait(executor);
-            finished.set(true);
+                MakeStrip.CANCEL.set(true);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e1) {}
+                pool.shutdownNow();
+                while(!pool.isTerminated()) {}
+            }
+        });
+        pool.shutdown();
+        
+        try {
+            pool.awaitTermination(2, TimeUnit.DAYS);
+        } catch (InterruptedException e1) {
+            logger.log(WARNING, "startConversion() was intruppted: ", e1);
         }
         progress.setCompleted();
     }
-
-    @Override
-    public void finish(MakeStrip mtask) {
-        Errors errors = mtask.getErrors();
-        OneOrMany<Path> convertedFiles = mtask.getConvertedFiles();
-        ConvertTask task = mtask.getTask();
-
-        synchronized(progress) {
-            progress.setString("Converted: "+errors.getSubpath());
-            progress.setTitle(progress.getCurrentProgress() + totalSign);
-            progress.increaseBy1();
+    
+    private class ThreadPool extends ThreadPoolExecutor {
+        public ThreadPool(int nThreads) {
+            super(nThreads, nThreads, 0L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
         }
-
-        if(!errors.hasError() && !convertedFiles.isEmpty()){
-            OneOrMany<Path> result = new OneOrMany<>();
-            if(convertedFiles.isSingleValued()) 
-                result.add(move(convertedFiles.getValue(), task.getTarget().resolveSibling(task.getTarget().getFileName()+".jpeg"), errors));
-            else {
-                int n = 1; 
-                for (Path p : convertedFiles.getValues())
-                    result.add(move(p, task.getTarget().resolveSibling(task.getTarget().getFileName()+" - "+(n++)+".jpeg"), errors));    
-            }
-            if(!errors.hasError()) {
+        @SuppressWarnings("unchecked")
+        @Override
+        protected void afterExecute(Runnable r, Throwable t) {
+            super.afterExecute(r, t);
+            
+            if(r != null && r instanceof Future) {
+                MakeStripResult ms;
                 try {
-                    backup(task.getSource());
-                    task.setResult(result);
-                } catch (IOException e) {
-                    errors.addGeneralError(e, "failed to move to backup: ",task.getSource());
+                    ms = ((Future<MakeStripResult>)r).get();
+                } catch (InterruptedException | ExecutionException e1) {
+                    logger.log(WARNING, "thread Interrupted : " + Thread.currentThread().getName(), e1);
+                    return;
                 }
+                
+                Errors errors = ms.errors;
+                OneOrMany<Path> convertedFiles = ms.convertedFiles;
+                ConvertTask task = ms.task;
+                
+                EventQueue.invokeLater(() -> {
+                    progress.setString("Converted: "+errors.getSubpath());
+                    progress.setTitle(progress.getCurrentProgress() + totalSign);
+                    progress.increaseBy1();
+                });
+                
+                if(!errors.hasError() && !convertedFiles.isEmpty()){
+                    OneOrMany<Path> result = new OneOrMany<>();
+                    if(convertedFiles.isSingleValued()) 
+                        result.add(move(convertedFiles.getValue(), task.getTarget().resolveSibling(task.getTarget().getFileName()+".jpeg"), errors));
+                    else {
+                        int n = 1; 
+                        for (Path p : convertedFiles.getValues())
+                            result.add(move(p, task.getTarget().resolveSibling(task.getTarget().getFileName()+" - "+(n++)+".jpeg"), errors));    
+                    }
+                    if(!errors.hasError()) {
+                        try {
+                            backup(task.getSource());
+                            task.setResult(result);
+                        } catch (IOException e) {
+                            errors.addGeneralError(e, "failed to move to backup: ",task.getSource());
+                        }
+                    }
+                }
+                if(errors.hasError()) {
+                    errorsList.add(errors);
+                    logger.warning(errors.getSubpath()+"\n"+errors);
+                }
+                return;
             }
+            EventQueue.invokeLater(progress::increaseBy1);
         }
-        if(errors.hasError()) {
-            errorsList.add(errors);
-            System.out.println(errors.getSubpath()+"\n"+errors);
-        }
-    }
-    private Path move(Path src, Path target, Errors errors) {
-        try {
-            Path backup = backup(target);
-            if(backup != null)
-                errors.addGarbagedError(Utils.subpath(target), Utils.subpath(backup));
-        } catch (IOException e) {
-            errors.addMoveFailed(e, "Failed to garbage", target);
+        
+        private Path move(Path src, Path target, Errors errors) {
+            try {
+                Path backup = backup(target);
+                if(backup != null)
+                    errors.addGarbagedError(Utils.subpath(target), Utils.subpath(backup));
+            } catch (IOException e) {
+                errors.addMoveFailed(e, "Failed to garbage", target);
+                return null;
+            }
+            try {
+                return  Files.move(src, target, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                errors.addMoveFailed(e, "Failed to move", "src: ", src, " | target: ",target);
+            }
             return null;
         }
-        try {
-            return  Files.move(src, target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            errors.addMoveFailed(e, "Failed to move", "src: ", src, " | target: ",target);
-        }
-        return null;
     }
     private Path backup(Path p) throws IOException {
         return Utils.backupMove(p, IMAGES_BACKUP_DIR);
     }
-
 }

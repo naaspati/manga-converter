@@ -1,20 +1,30 @@
 package samrock.converters.mangarock;
-import static sam.properties.myconfig.MyConfig.MANGAROCK_DB_BACKUP;
-import static sam.properties.myconfig.MyConfig.MANGAROCK_INPUT_DB;
-import static samrock.converters.mangarock.MangarockManga.*;
+import static sam.config.MyConfig.MANGAROCK_DB_BACKUP;
+import static sam.config.MyConfig.MANGAROCK_INPUT_DB;
+import static samrock.converters.mangarock.MangarockManga.AUTHOR;
+import static samrock.converters.mangarock.MangarockManga.CATEGORIES;
+import static samrock.converters.mangarock.MangarockManga.DESCRIPTION;
+import static samrock.converters.mangarock.MangarockManga.LAST_UPDATE;
+import static samrock.converters.mangarock.MangarockManga.MANGA_ID;
+import static samrock.converters.mangarock.MangarockManga.NAME;
+import static samrock.converters.mangarock.MangarockManga.RANK;
+import static samrock.converters.mangarock.MangarockManga.STATUS;
+import static samrock.converters.mangarock.MangarockManga.TABLE_NAME;
+import static samrock.converters.mangarock.MangarockManga.TOTAL_CHAPTERS;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
-import sam.console.ansi.ANSI;
-import sam.sql.sqlite.SqliteManeger;
-import sam.sql.sqlite.querymaker.QueryMaker;
+import sam.console.ANSI;
+import sam.sql.querymaker.QueryMaker;
+import sam.sql.sqlite.SQLiteManeger;
 
 public class MangarockDB implements AutoCloseable {
-    private final SqliteManeger maneger;
+    private final SQLiteManeger maneger;
     private final String path;
 
     public MangarockDB() throws SQLException, InstantiationException, IllegalAccessException, ClassNotFoundException {
@@ -22,8 +32,8 @@ public class MangarockDB implements AutoCloseable {
         if(path == null)
             throw new SQLException("File not found: "+MANGAROCK_INPUT_DB + " |nor| "+MANGAROCK_DB_BACKUP);
         
-        System.out.println(ANSI.yellow("manga_db: ")+path);
-        maneger = new SqliteManeger(path, true);
+        Logger.getLogger(MangarockDB.class.getName()).info(ANSI.yellow("manga_db: ")+path);
+        maneger = new SQLiteManeger(path);
     }
 
     public String getPath() {
@@ -37,17 +47,15 @@ public class MangarockDB implements AutoCloseable {
                 .from(TABLE_NAME)
                 .where(w -> w.in(MANGA_ID, mangaIds)).build() + " "+extraCondition;
         
-        List<MangarockManga> list = new ArrayList<>();
-        maneger.executeQueryIterate(sql, rs -> list.add(new MangarockManga(rs)));
+        List<MangarockManga> list = maneger.collect(sql, new ArrayList<>(), MangarockManga::new);
         return list;
     }
     
     public List<MangarockManga> getMangas(int[] mangaIds) throws SQLException {
         return getMangas(mangaIds, "");
     }
-    public ArrayList<MangarockDownloadTask> readDownloadTasks() throws SQLException {
-        ArrayList<MangarockDownloadTask> list = new ArrayList<>();
-        maneger.executeQueryIterate("SELECT chapter_name, dir_name, manga_id FROM DownloadTask", rs -> list.add(new MangarockDownloadTask(rs)));
+    public List<MangarockDownloadTask> readDownloadTasks() throws SQLException {
+        ArrayList<MangarockDownloadTask> list = maneger.collect("SELECT chapter_name, dir_name, manga_id FROM DownloadTask",new ArrayList<>(), MangarockDownloadTask::new);
         return list;
     }
     @Override

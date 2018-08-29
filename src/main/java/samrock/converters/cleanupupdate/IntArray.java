@@ -29,7 +29,7 @@ public class IntArray {
         return array[index];
     }
     public boolean contains(int value) {
-        return array.length != 0 && Arrays.binarySearch(array, value) >= value;
+        return array.length != 0 && Arrays.binarySearch(array, value) >= 0;
     }
     public int[] toArray() {
         return Arrays.copyOf(array, array.length);
@@ -39,5 +39,10 @@ public class IntArray {
     }
     public boolean isEmpty() {
         return array.length == 0;
+    }
+    
+    @Override
+    public String toString() {
+    	return Arrays.toString(array);
     }
 }

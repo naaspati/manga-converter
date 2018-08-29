@@ -2,7 +2,7 @@ package samrock.converters.filechecker;
 
 import static samrock.converters.extras.Utils.DATA_FOLDER;
 import static samrock.converters.extras.Utils.DONT_SKIP_NUMBER_MISSINGS_CHECK;
-import static samrock.converters.extras.Utils.MANGA_FOLDER;
+import static samrock.converters.extras.Utils.MANGA_DIR;
 import static samrock.converters.extras.Utils.MAX_FILE_NUMBER;
 
 import java.io.IOException;
@@ -10,14 +10,16 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.stream.IntStream;
+import java.util.BitSet;
 import java.util.stream.Stream;
 
 import samrock.converters.extras.Errors;
 
 public class FilesChecker {
-    final static int mcount = MANGA_FOLDER.getNameCount() + 1;
-    final static int dcount = DATA_FOLDER.getNameCount() + 1;
+    private FilesChecker() {}
+    
+    static final  int mcount = MANGA_DIR.getNameCount() + 1;
+    static final  int dcount = DATA_FOLDER.getNameCount() + 1;
     
     public static ResultOrErrors check(Path src, Path target) throws IOException {
         if(!Files.isDirectory(src)) 
@@ -30,11 +32,11 @@ public class FilesChecker {
         return checkDir(src);
     }
     private static void checkBadDir(Path path) throws IOException {
-        if(path.equals(MANGA_FOLDER) || Files.isSameFile(path, MANGA_FOLDER))
-            throw new IllegalArgumentException("trying to convert manga_folder: "+MANGA_FOLDER);
+        if(path.equals(MANGA_DIR) || Files.isSameFile(path, MANGA_DIR))
+            throw new IllegalArgumentException("trying to convert manga_folder: "+MANGA_DIR);
         if(path.equals(DATA_FOLDER) || Files.isSameFile(path, DATA_FOLDER))
             throw new IllegalArgumentException("trying to convert data_folder: "+DATA_FOLDER);
-        if(path.startsWith(MANGA_FOLDER) && path.getNameCount() == mcount)
+        if(path.startsWith(MANGA_DIR) && path.getNameCount() == mcount)
             throw new IllegalArgumentException("trying to convert manga_dir in manga_folder: "+path);
         if(path.startsWith(DATA_FOLDER) && path.getNameCount() == dcount)
             throw new IllegalArgumentException("trying to convert data_dir in data_folder: "+path);
@@ -84,8 +86,7 @@ public class FilesChecker {
             return new ResultOrErrors(errors);
         }
 
-        Path[] paths2 = paths;
-        int[] missings = !DONT_SKIP_NUMBER_MISSINGS_CHECK ? null : IntStream.range(0, max + 1).filter(i -> paths2[i] == null).toArray();
+        int[] missings = !DONT_SKIP_NUMBER_MISSINGS_CHECK ? null : missings(paths);
 
         if(missings != null && missings.length != 0)
             errors.addMissingsImages(missings);
@@ -93,5 +94,29 @@ public class FilesChecker {
         if(errors.hasError()) new ResultOrErrors(errors);
 
         return new ResultOrErrors(Stream.of(paths).limit(max+1).map(f -> f == null ? null : new CheckedFile(f)).toArray(CheckedFile[]::new));
+    }
+    private static int[] missings(Path[] paths) {
+        BitSet b = null;
+        int  t = 0;
+        for (int j = 0; j < paths.length; j++) {
+            if(paths[j] == null) {
+                if(b == null)
+                    b = new BitSet(paths.length);
+                b.set(j);
+                t++;
+            }
+        }
+        
+        if(t == 0)
+            return null;
+        
+        int[] ret = new int[t];
+        int n = 0;
+        for (int i = 0; i < t; i++) {
+            if(b.get(i))
+                ret[n++] = i; 
+        }
+        
+        return ret;
     }
 }

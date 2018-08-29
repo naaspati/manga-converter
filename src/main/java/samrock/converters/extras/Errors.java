@@ -94,9 +94,8 @@ public class Errors extends HashMap<String, List<Object>> {
     }
     public StringBuilder appendTo(StringBuilder sb) {
         this.forEach((key, list) -> {
-            sb.append(key).append('\n');
+            sb.append('\n').append(key).append('\n');
             list.forEach(s -> sb.append("  ").append(s).append('\n'));
-            sb.append('\n');
         });
         return sb;
     }

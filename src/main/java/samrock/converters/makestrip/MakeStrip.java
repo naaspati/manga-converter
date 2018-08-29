@@ -1,5 +1,5 @@
 package samrock.converters.makestrip;
-import static sam.console.ansi.ANSI.red;
+import static sam.console.ANSI.red;
 import static samrock.converters.extras.Utils.DONT_SKIP_DOUBLE_PAGE_CHECK;
 import static samrock.converters.extras.Utils.DONT_SKIP_FISHY_CHECK;
 import static samrock.converters.extras.Utils.DONT_SKIP_PAGE_SIZE_CHECK;
@@ -16,14 +16,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 
-import sam.myutils.fileutils.FilesUtils;
-import sam.myutils.onmany.OneOrMany;
+import sam.collection.OneOrMany;
+import sam.fileutils.FileOpener;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
 import samrock.converters.extras.Utils;
@@ -34,22 +38,22 @@ import samrock.converters.filechecker.CheckedFile;
  * 
  *
  */
-public class MakeStrip implements Runnable {
+public class MakeStrip implements Callable<MakeStripResult> {
     public static final AtomicBoolean CANCEL = new AtomicBoolean();
+
     public static final Path TEMP_DIR = Utils.createBackupFolder(MakeStrip.class);
+    private static final int MAX_IMAGE_HEIGHT = 65500;
 
     static {
         try {
             Files.createDirectories(TEMP_DIR);
         } catch (IOException e) {
+            Logger.getLogger(MakeStrip.class.getName()).log(Level.SEVERE, "failed to create: "+TEMP_DIR, e);
             throw new RuntimeException("failed to create: "+TEMP_DIR, e);
         }
     }
-
     private final ConvertTask task;
-    private final MakeStripFinished finish;
     private Errors errors;
-    private OneOrMany<Path> convertedFiles;
 
     /**
      * 
@@ -57,81 +61,79 @@ public class MakeStrip implements Runnable {
      * @param f
      * @throws IOException
      */
-    public MakeStrip(ConvertTask task, MakeStripFinished finish) {
+    public MakeStrip(ConvertTask task) {
         Objects.requireNonNull(task);
-        Objects.requireNonNull(finish);
-
         this.task = task;
-        this.finish = finish;
-    }
-    
-    public OneOrMany<Path> getConvertedFiles() {
-        return convertedFiles;
-    }
-    public ConvertTask getTask() {
-        return task;
     }
 
     @Override
-    public void run() {
-        if(CANCEL.get()) return;
+    public MakeStripResult call() {
+        if(CANCEL.get()) return null;
 
         errors = new Errors(task.getSource());
-        convertedFiles = new OneOrMany<>();
 
         try {
-            start();
+            if(CANCEL.get()) {
+                getErrors().setCancelled();
+                return new MakeStripResult(task, errors, null);
+            }
+            return new MakeStripResult(task, errors, call2());
         } catch (NullPointerException|OutOfMemoryError e) {
             getErrors().addGeneralError(e, "Error while converting");
+            return new MakeStripResult(task, errors, null);
+        } finally {
+            if(images != null) {
+                images.clear();
+                images = null;
+            }
         }
-
-        if(CANCEL.get())
-            getErrors().setCancelled();
-
-        finish.finish(this);
     }
+
     private boolean imageError = false;
-    ArrayList<BufferedImage> images;
+    private LinkedList<BufferedImage> images;
+    private OneOrMany<Path> result;
 
     public void setImageError() {
         this.imageError = true;
-        images.clear();
-        convertedFiles.clear();
+        if(images != null)
+            images.clear();
+        images = null;
+        if(result != null) {
+            result.clear();
+            result = null;
+        }
     }
-    private void start() {
-        if(CANCEL.get()) return;
+    private OneOrMany<Path> call2() {
+        if(CANCEL.get()) return null;
 
-        int currentHeight = 0;
-        images = new ArrayList<>();
+        images = new LinkedList<>();
+        result = new OneOrMany<>();
 
         List<Path> doublePages = DONT_SKIP_DOUBLE_PAGE_CHECK ? new ArrayList<>() : null;
+        int width = 0;
+        int height = 0;
 
         for (CheckedFile t : task.getFiles()) {
-            if(CANCEL.get()) return;
+            if(CANCEL.get()) return null;
 
             if(t == null)
                 continue;
             Path path = t.getPath();
-            
+
             try(InputStream is = Files.newInputStream(path, StandardOpenOption.READ)) {
                 BufferedImage img = ImageIO.read(is);
-                if(!imageError)
-                    images.add(img);
 
                 //check non images and nullPointers
                 int w = img.getWidth();
                 int h = img.getHeight();
 
-                if(DONT_SKIP_FISHY_CHECK && h > 65500/3){
-                    System.out.println(red("something is fishy, image height found to be: "+h)+"\t"+task.getSource());
+                if(DONT_SKIP_FISHY_CHECK && h > MAX_IMAGE_HEIGHT/3){
+                    Logger.getLogger(MakeStrip.class.getName()).severe(red("something is fishy, image height found to be: "+h)+"\t"+task.getSource());
                     Files.write(Paths.get("fish.txt"), ("something is fishy, image height found to be: "+h+"\t"+task.getSource()).getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                    FilesUtils.openFile(new File("fish.txt"));
+                    FileOpener.openFile(new File("fish.txt"));
                     setImageError();
                     System.exit(0);
                 }
-
-                currentHeight += h;
-
                 if(DONT_SKIP_PAGE_SIZE_CHECK && (w < 100 || h < 100)){
                     getErrors().addImageSizeError(path.subpath(path.getNameCount() - 2, path.getNameCount()), w, h);
                     setImageError(); 
@@ -139,11 +141,18 @@ public class MakeStrip implements Runnable {
                 if(DONT_SKIP_DOUBLE_PAGE_CHECK && w > 1000)
                     doublePages.add(subpath(path));
 
-                if(!imageError && currentHeight > 65500) {
-                    if(!convert(images.subList(0, images.size() - 1)))
-                        setImageError();
-                    currentHeight = h;
+                if(height + h > MAX_IMAGE_HEIGHT) {
+                    if(!imageError)
+                        convert(width, height);
+                    width = 0;
+                    height = 0;
                 }
+
+                width = Math.max(w, width);
+                height += h;
+
+                if(!imageError)
+                    images.add(img);
             } catch (IOException|NullPointerException|IllegalArgumentException e) {
                 getErrors().addImageError(e, "Image Error", path.subpath(path.getNameCount() - 2, path.getNameCount()));
                 setImageError();
@@ -154,31 +163,28 @@ public class MakeStrip implements Runnable {
 
         if(doublePageCount > 0  && doublePageCount > task.getFiles().length  - task.getFiles().length/4){
             getErrors().addDoublePagesError(doublePages);
-            return;
+            return null;
         }
         if(!imageError && !images.isEmpty())
-            imageError = convert(images);
+            convert(width, height);
+
+        return result;
     }
-    private boolean convert(List<BufferedImage> images) {
+    private boolean convert(int width, int height) {
         if(CANCEL.get()) return false;
 
-        int height = 0, width = 0;
-        for (BufferedImage m : images) {
-            width = Math.max(width, m.getWidth());
-            height += m.getHeight();
-        }
-        
-        Path temp = createStrip(images, width, height);
+        Path temp = createStrip(width, height);
 
         if(temp != null){
-            convertedFiles.add(temp);
+            result.add(temp);
             return true;
         }
-        images.clear();
+
+        setImageError();
         return false;
 
     }
-    private Path createStrip(List<BufferedImage> images, int width, int height) {
+    private Path createStrip(final int width, final int height) {
         if(CANCEL.get()) return null;
 
         Path temp = null;
@@ -193,18 +199,28 @@ public class MakeStrip implements Runnable {
         Graphics2D g = finalImage.createGraphics();
 
         int totalHeight = 0;
-        for (BufferedImage m : images) {
+
+        while(!images.isEmpty()) {
+            if(CANCEL.get()) return null;
+
+            BufferedImage m = images.removeFirst();
+
             g.drawImage(m, (width - m.getWidth()) / 2, totalHeight, null);
             totalHeight += m.getHeight();
-            m.flush();    
+            m.flush();
         }
         g.dispose();
+
+        if(totalHeight != height) {
+            errors.addImageError(null, String.format("converted height(%s) is not equal to expected height(%s)", totalHeight, height));
+            return null;
+        }
 
         try(OutputStream os = Files.newOutputStream(temp)) {
             ImageIO.write(finalImage, "jpeg", os);
             return temp;
         } catch (IOException e) {
-            getErrors().addImageError(e, "Unable to save Image");
+            getErrors().addImageError(e, "Unable to save Image: size");
         }
         return null;
     }

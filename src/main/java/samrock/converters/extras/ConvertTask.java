@@ -2,7 +2,7 @@ package samrock.converters.extras;
 
 import java.nio.file.Path;
 
-import sam.myutils.onmany.OneOrMany;
+import sam.collection.OneOrMany;
 import samrock.converters.filechecker.CheckedFile;
 
 public class ConvertTask {

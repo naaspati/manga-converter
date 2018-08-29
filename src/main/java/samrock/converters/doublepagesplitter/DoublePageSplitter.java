@@ -1,13 +1,10 @@
 package samrock.converters.doublepagesplitter;
 
-import static sam.console.ansi.ANSI.createBanner;
-import static sam.console.ansi.ANSI.red;
-import static sam.console.ansi.ANSI.yellow;
-import static sam.swing.utils.SwingUtils.dirPathInputOptionPane;
+import static sam.console.ANSI.createBanner;
+import static sam.console.ANSI.red;
+import static sam.console.ANSI.yellow;
 import static samrock.converters.extras.Utils.backupMove;
 import static samrock.converters.extras.Utils.confirm;
-import static samrock.converters.extras.Utils.printError;
-import static samrock.converters.extras.Utils.println;
 import static samrock.converters.extras.Utils.subpath;
 
 import java.awt.image.BufferedImage;
@@ -23,13 +20,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 import javax.swing.JOptionPane;
 
-import sam.console.ansi.ANSI;
-import sam.console.ansi.ANSI.FOREGROUND;
+import sam.console.ANSI;
+import sam.console.ANSI.FOREGROUND;
+import sam.swing.SwingUtils;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
 import samrock.converters.extras.Utils;
@@ -40,12 +39,13 @@ import samrock.converters.filechecker.ResultOrErrors;
 public class DoublePageSplitter implements Runnable {
     private static final Path BACKUP_DIR = Utils.createBackupFolder(DoublePageSplitter.class);
     private static final Path TEMP_DIR = BACKUP_DIR.resolve("temp");
+    private static final Logger logger = Logger.getLogger(DoublePageSplitter.class.getName()); 
 
     public static void splitSingleFolder() throws IOException{
         String folderPath = JOptionPane.showInputDialog(null, "Folder Path", "Double Page Splitter", JOptionPane.QUESTION_MESSAGE);
 
         if(folderPath == null || folderPath.isEmpty()){
-            printError("operation cancelled");
+            logger.warning("operation cancelled");
             return;
         }
         Path p = Paths.get(folderPath);
@@ -58,12 +58,12 @@ public class DoublePageSplitter implements Runnable {
     }
 
     public static void batchFolderSplitting() throws IOException{
-        File folder = dirPathInputOptionPane("Enter path to folder");
+        File folder = SwingUtils.dirPathInputOptionPane("Enter path to folder");
 
         if(folder != null){
             File[] folders = folder.listFiles(File::isDirectory);
             if(folders.length == 0)
-                println(red("no folders in folder: "),folder);
+                logger.warning(red("no folders in folder: ")+folder);
             else{
                 System.out.println(yellow("total: ")+folders.length);
                 List<Errors> errors = new ArrayList<>();
@@ -130,7 +130,7 @@ public class DoublePageSplitter implements Runnable {
     @Override
     public void run() {
         Errors err = new Errors(task.getSource());
-        println("splitting: "+task.getSource());
+        logger.info("splitting: "+task.getSource());
         try {
             start(err);
         } catch (IOException e) {
@@ -193,7 +193,7 @@ public class DoublePageSplitter implements Runnable {
     private void split(BufferedImage m, Path file) throws IOException {
         if (m.getWidth() < 1000) {
             splittedImages.add(Files.copy(file, Files.createTempFile(TEMP_DIR, file.getFileName().toString(), null)));
-            println("\tpossibly a single page: " , file.getFileName());
+            logger.warning("\tpossibly a single page: " + file.getFileName());
             return;
         }
         splittedImages.add(split(m, file, true));
