@@ -134,8 +134,8 @@ public class CheckupsAndUpdates {
 					newIds[newIndex++] = id ;
 			}
 
-			final IntArray newMangaIds = newIndex == 0 ? null : new IntArray(newIds, newIndex);
-			final IntArray oldMangaIds = oldIndex == 0 ? null :new IntArray(oldIds, oldIndex);
+			final IntArray newMangaIds = newIndex == 0 ? new IntArray(new int[0]) : new IntArray(newIds, newIndex);
+			final IntArray oldMangaIds = oldIndex == 0 ? new IntArray(new int[0]) :new IntArray(oldIds, oldIndex);
 
 			if(newMangaIds != null) {
 				progressor.setTitle("proceessing New Mangas");
