@@ -7,7 +7,6 @@ import static samrock.converters.extras.Utils.subpath;
 
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -119,9 +118,11 @@ public class MakeStrip implements Callable<MakeStripResult> {
             if(t == null)
                 continue;
             Path path = t.getPath();
+            
+            BufferedImage img = null;
 
             try(InputStream is = Files.newInputStream(path, StandardOpenOption.READ)) {
-                BufferedImage img = ImageIO.read(is);
+                img = ImageIO.read(is);
 
                 //check non images and nullPointers
                 int w = img.getWidth();
@@ -130,7 +131,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
                 if(DONT_SKIP_FISHY_CHECK && h > MAX_IMAGE_HEIGHT/3){
                     Logger.getLogger(MakeStrip.class.getName()).severe(red("something is fishy, image height found to be: "+h)+"\t"+task.getSource());
                     Files.write(Paths.get("fish.txt"), ("something is fishy, image height found to be: "+h+"\t"+task.getSource()).getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                    FileOpener.openFile(new File("fish.txt"));
+                    FileOpener.openFile(Paths.get("fish.txt").toFile());
                     setImageError();
                     System.exit(0);
                 }
@@ -154,7 +155,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
                 if(!imageError)
                     images.add(img);
             } catch (IOException|NullPointerException|IllegalArgumentException e) {
-                getErrors().addImageError(e, "Image Error", path.subpath(path.getNameCount() - 2, path.getNameCount()));
+                getErrors().addImageError(e, "Image Error", path.subpath(path.getNameCount() - 2, path.getNameCount()), img != null ? "img type: "+ img.getType() : "");
                 setImageError();
             }
         }
@@ -170,7 +171,8 @@ public class MakeStrip implements Callable<MakeStripResult> {
 
         return result;
     }
-    private boolean convert(int width, int height) {
+
+	private boolean convert(int width, int height) {
         if(CANCEL.get()) return false;
 
         Path temp = createStrip(width, height);

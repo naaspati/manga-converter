@@ -19,6 +19,8 @@ class Convert extends ConvertOption {
     
     @Parameter(names= {"-u","--update"},description = "update with given chapters data")
     public boolean update;
+    @Parameter(names= {"--dirs"},description = "update with given chapters data")
+    public boolean dirs;
     
     public String tempChapter;
     @Parameter

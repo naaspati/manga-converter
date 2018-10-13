@@ -3,6 +3,8 @@ package samrock.converters.mangarock;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import sam.manga.samrock.mangas.MangaUtils;
+
 public class MangarockManga {
     public static final String AUTHOR = "author";
     public static final String CATEGORIES = "categories";
@@ -64,6 +66,12 @@ public class MangarockManga {
     public int getRank() {
         return rank;
     }
+    
+    private String dirName;
+    public String getDirName() {
+    	return dirName != null ? dirName : (dirName = MangaUtils.toDirName(getName()));
+    }
+    
 	@Override
 	public String toString() {
 		return "MangarockManga [author=" + author + ", categories=" + categories + ", description=" + description

@@ -1,6 +1,6 @@
 package samrock.converters.cleanupupdate;
 
-import sam.manga.newsamrock.chapters.Chapter;
+import sam.manga.samrock.chapters.Chapter;
 
 class ListManga {
     final int chap_count_pc;

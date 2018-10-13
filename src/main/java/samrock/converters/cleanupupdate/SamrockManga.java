@@ -1,21 +1,22 @@
 package samrock.converters.cleanupupdate;
 
-import static sam.manga.newsamrock.mangas.MangasMeta.DIR_NAME;
-import static sam.manga.newsamrock.mangas.MangasMeta.MANGA_ID;
-import static sam.manga.newsamrock.mangas.MangasMeta.LAST_UPDATE_TIME;
+import static sam.manga.samrock.mangas.MangasMeta.DIR_NAME;
+import static sam.manga.samrock.mangas.MangasMeta.MANGA_ID;
+import static sam.manga.samrock.mangas.MangasMeta.LAST_UPDATE_TIME;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import sam.manga.newsamrock.SamrockDB;
+import sam.manga.samrock.SamrockDB;
+import sam.manga.samrock.mangas.MangaUtils;
 
 class SamrockManga {
     static List<SamrockManga> loadAll(SamrockDB db) throws SQLException{
         List<SamrockManga> list = new ArrayList<>();
         
-        db.manga().selectAll(rs -> list.add(new SamrockManga(rs)), MANGA_ID, DIR_NAME, LAST_UPDATE_TIME);
+        new MangaUtils(db).selectAll(rs -> list.add(new SamrockManga(rs)), MANGA_ID, DIR_NAME, LAST_UPDATE_TIME);
         return list;
     }
     

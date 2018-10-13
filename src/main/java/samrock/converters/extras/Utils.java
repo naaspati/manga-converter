@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -32,13 +33,13 @@ import javax.swing.JOptionPane;
 import sam.config.MyConfig;
 import sam.fileutils.FilesWalker;
 import sam.fileutils.FilesWalker.FileWalkResult;
-import sam.sql.querymaker.QueryMaker;
 
 public class Utils {
     private Utils() {}
-
-    public static final Path APP_DATA = Paths.get("app_data");
-
+    
+    public static final Path APP_DATA = Paths.get(Optional.of(lookup("APP_DATA")).orElse("app_data")) ;
+    public static final Path CACHE_DIR = APP_DATA.resolve("cache");
+    
     public static final Path MANGAROCK_DB_BACKUP = Paths.get(MyConfig.MANGAROCK_DB_BACKUP);
     public static final Path MANGAROCK_INPUT_DB = Paths.get(MyConfig.MANGAROCK_INPUT_DB);
     public static final Path MANGAROCK_INPUT_DIR = Paths.get(MyConfig.MANGAROCK_INPUT_DIR);
@@ -64,7 +65,7 @@ public class Utils {
             if(m == currentMonth)
                 continue;
 
-            Path p = Utils.APP_DATA.resolve(m.toString().toLowerCase());
+            Path p = CACHE_DIR.resolve(m.toString().toLowerCase());
 
             if(Files.exists(p)) {
                 try {
@@ -114,9 +115,9 @@ public class Utils {
     }
     
     private static void finish() {
-        if(Files.exists(APP_DATA)) {
+        if(Files.exists(CACHE_DIR)) {
             try {
-                Files.walk(APP_DATA)
+                Files.walk(CACHE_DIR)
                 .filter(Files::isDirectory)
                 .sorted((f1, f2) -> Integer.compare(f2.getNameCount(), f1.getNameCount()))
                 .map(Path::toFile)
@@ -125,10 +126,7 @@ public class Utils {
         }
         Logger.getLogger(Utils.class.getName()).info(yellow("\nfinished"));
     }
-
-    public static QueryMaker qm() {
-        return QueryMaker.getInstance();
-    }
+    
     public static boolean confirm(String msg) {
         return JOptionPane.showConfirmDialog(null, msg) == JOptionPane.YES_OPTION;
     }
@@ -167,7 +165,7 @@ public class Utils {
     public static Path createBackupFolder(Class<?> cls) {
         Month currentMonth = LocalDate.now().getMonth();
         try {
-            Path path = Utils.APP_DATA.resolve(currentMonth.toString().toLowerCase()).resolve(cls.getCanonicalName());
+            Path path = CACHE_DIR.resolve(currentMonth.toString().toLowerCase()).resolve(cls.getCanonicalName());
             Files.createDirectories(path);
 
             return path;

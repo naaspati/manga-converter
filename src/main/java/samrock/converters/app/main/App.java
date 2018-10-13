@@ -20,7 +20,7 @@ import samrock.converters.extras.Utils;
 import samrock.converters.makestrip.ConvertProcessor;
 
 public class App {
-    static final double VERSION = 2.02;
+    static final double VERSION = 2.022;
 
     @Parameter(names= {"-h", "--help"},description = "print this", help=true, order=0)
     public boolean help;
@@ -40,7 +40,7 @@ public class App {
     @Parameter
     List<String> argsList;
 
-    public static void main(String[] args) throws IllegalArgumentException, IllegalAccessException {
+    public static void main(String[] args) throws IllegalArgumentException, IllegalAccessException, IOException {
         System.setProperty("java.util.logging.config.file","logging.properties");
         new File("app_data/logs").mkdirs();
         
@@ -98,13 +98,12 @@ public class App {
             }
             try {
                 logger().config(() -> ManagementFactory.getRuntimeMXBean().getInputArguments().stream().collect(Collectors.joining("\n  ", yellow("\nJVM PARAMETERS\n  "), "")));
+                ConvertProcessor cp = new ConvertProcessor();
 
                 if(c.update)
-                	ConvertProcessor.onlyOpdate(Utils.CHAPTERS_DATA_FILE);
+                	cp.onlyOpdate(Utils.CHAPTERS_DATA_FILE);
                 else
-                	ConvertProcessor.process(Utils.CHAPTERS_DATA_FILE, c.mangarockMoveOnly);
-                	
-                
+                	cp.process(Utils.CHAPTERS_DATA_FILE, c.mangarockMoveOnly);
             } catch (IOException e) {
                 SwingUtils.showErrorDialog("Error with conversion", e);
                 logger().log(SEVERE, "Error with conversion", e);

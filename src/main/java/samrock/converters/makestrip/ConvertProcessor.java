@@ -10,23 +10,21 @@ import java.util.logging.Logger;
 
 import sam.config.MyConfig;
 import sam.console.ANSI;
-import sam.manga.newsamrock.chapters.ChapterWithMangaId;
-import sam.manga.newsamrock.converter.ConvertChapter;
+import sam.manga.samrock.chapters.ChapterWithMangaId;
+import sam.manga.samrock.converter.ConvertChapter;
 import sam.tsv.Tsv;
 import samrock.converters.cleanupupdate.CheckupsAndUpdates;
 import samrock.converters.extras.Progressor;
 
 public class ConvertProcessor {
-	private ConvertProcessor() {}
-
-	public static void process(Path chaptersDataFile, boolean onlyMove) throws IOException {
+	public void process(Path chaptersDataFile, boolean onlyMove) throws IOException {
 		List<ConvertChapter> chapters = read(chaptersDataFile);
 		if(chapters == null || chapters.isEmpty())
 			return;
 
 		process(chapters, onlyMove);
 	}
-	private static List<ConvertChapter> read(Path chaptersDataFile) throws IOException {
+	private List<ConvertChapter> read(Path chaptersDataFile) throws IOException {
 		Objects.requireNonNull(chaptersDataFile);
 
 		Tsv tsv = Tsv.parse(chaptersDataFile);
@@ -38,7 +36,7 @@ public class ConvertProcessor {
 		return ConvertChapter.parse(tsv);
 	}
 
-	public static void process(List<ConvertChapter> chapters, boolean onlyMove)  {
+	public void process(List<ConvertChapter> chapters, boolean onlyMove)  {
 		Progressor progress = chapters.size() < 4 ? new Progressor(Logger.getLogger(ConvertProcessor.class.getName())) : new Progressor("", chapters.size());
 
 		Converter converter = new Converter(progress);
@@ -57,7 +55,7 @@ public class ConvertProcessor {
 		}
 	}
 
-	public static void onlyOpdate(Path chaptersDataFile) throws IOException {
+	public void onlyOpdate(Path chaptersDataFile) throws IOException {
 		Progressor p = new Progressor(Logger.getLogger("update"));
 
 		List<ConvertChapter> chapters = read(chaptersDataFile);

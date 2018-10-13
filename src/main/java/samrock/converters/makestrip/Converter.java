@@ -26,8 +26,8 @@ import java.util.logging.Logger;
 
 import sam.collection.OneOrMany;
 import sam.console.ANSI;
-import sam.manga.newsamrock.chapters.ChapterWithMangaId;
-import sam.manga.newsamrock.converter.ConvertChapter;
+import sam.manga.samrock.chapters.ChapterWithMangaId;
+import sam.manga.samrock.converter.ConvertChapter;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
 import samrock.converters.extras.Progressor;

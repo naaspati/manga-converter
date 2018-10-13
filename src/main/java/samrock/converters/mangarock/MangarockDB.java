@@ -21,10 +21,10 @@ import java.util.logging.Logger;
 
 import sam.console.ANSI;
 import sam.sql.querymaker.QueryMaker;
-import sam.sql.sqlite.SQLiteManeger;
+import sam.sql.sqlite.SQLiteDB;
 
 public class MangarockDB implements AutoCloseable {
-    private final SQLiteManeger maneger;
+    public final SQLiteDB maneger;
     private final String path;
 
     public MangarockDB() throws SQLException, InstantiationException, IllegalAccessException, ClassNotFoundException {
@@ -33,7 +33,7 @@ public class MangarockDB implements AutoCloseable {
             throw new SQLException("File not found: "+MANGAROCK_INPUT_DB + " |nor| "+MANGAROCK_DB_BACKUP);
         
         Logger.getLogger(MangarockDB.class.getName()).info(ANSI.yellow("manga_db: ")+path);
-        maneger = new SQLiteManeger(path);
+        maneger = new SQLiteDB(path);
     }
 
     public String getPath() {
