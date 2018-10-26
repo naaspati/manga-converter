@@ -21,12 +21,12 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 
 import sam.collection.OneOrMany;
-import sam.fileutils.FileOpener;
+import sam.io.fileutils.FileOpener;
+import sam.logging.MyLoggerFactory;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
 import samrock.converters.extras.Utils;
@@ -47,7 +47,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
         try {
             Files.createDirectories(TEMP_DIR);
         } catch (IOException e) {
-            Logger.getLogger(MakeStrip.class.getName()).log(Level.SEVERE, "failed to create: "+TEMP_DIR, e);
+            MyLoggerFactory.logger(MakeStrip.class.getName()).log(Level.SEVERE, "failed to create: "+TEMP_DIR, e);
             throw new RuntimeException("failed to create: "+TEMP_DIR, e);
         }
     }
@@ -129,7 +129,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
                 int h = img.getHeight();
 
                 if(DONT_SKIP_FISHY_CHECK && h > MAX_IMAGE_HEIGHT/3){
-                    Logger.getLogger(MakeStrip.class.getName()).severe(red("something is fishy, image height found to be: "+h)+"\t"+task.getSource());
+                    MyLoggerFactory.logger(MakeStrip.class.getName()).severe(red("something is fishy, image height found to be: "+h)+"\t"+task.getSource());
                     Files.write(Paths.get("fish.txt"), ("something is fishy, image height found to be: "+h+"\t"+task.getSource()).getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
                     FileOpener.openFile(Paths.get("fish.txt").toFile());
                     setImageError();

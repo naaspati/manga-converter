@@ -7,8 +7,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
-import samrock.converters.extras.Utils;
-
 public class Errors extends HashMap<String, List<Object>> {
     private static final long serialVersionUID = -7398299680125297994L;
 

@@ -3,7 +3,7 @@ package samrock.converters.extras;
 import static sam.console.ANSI.green;
 import static sam.console.ANSI.red;
 import static sam.console.ANSI.yellow;
-import static sam.myutils.MyUtilsSystem.lookup;
+import static sam.myutils.System2.lookup;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,14 +31,16 @@ import java.util.stream.Collectors;
 import javax.swing.JOptionPane;
 
 import sam.config.MyConfig;
-import sam.fileutils.FilesWalker;
-import sam.fileutils.FilesWalker.FileWalkResult;
+import sam.io.fileutils.FilesWalker;
+import sam.io.fileutils.FilesWalker.FileWalkResult;
+import sam.logging.MyLoggerFactory;
+import sam.myutils.MyUtilsException;
 
 public class Utils {
     private Utils() {}
     
     public static final Path APP_DATA = Paths.get(Optional.of(lookup("APP_DATA")).orElse("app_data")) ;
-    public static final Path CACHE_DIR = APP_DATA.resolve("cache");
+    public static final Path CACHE_DIR = MyUtilsException.noError(() -> Files.createTempDirectory("cache"));
     
     public static final Path MANGAROCK_DB_BACKUP = Paths.get(MyConfig.MANGAROCK_DB_BACKUP);
     public static final Path MANGAROCK_INPUT_DB = Paths.get(MyConfig.MANGAROCK_INPUT_DB);
@@ -78,7 +80,7 @@ public class Utils {
                     for (Path file : fr.dirs)
                         Files.delete(file);
                 } catch (IOException e) {
-                    Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, "failed to delete: "+ p, e);
+                    MyLoggerFactory.logger(Utils.class.getName()).log(Level.SEVERE, "failed to delete: "+ p, e);
                 }
             }
         }
@@ -89,7 +91,7 @@ public class Utils {
         else {
             Path p = Paths.get(s);
             if(!Files.isRegularFile(p)) {
-                Logger.getLogger(Utils.class.getName()).info(red(Files.exists(p) ? "not a file: " : "file not found: ")+p);
+                MyLoggerFactory.logger(Utils.class.getName()).info(red(Files.exists(p) ? "not a file: " : "file not found: ")+p);
                 p = null;
             }
             CHAPTERS_DATA_FILE = p;
@@ -103,7 +105,7 @@ public class Utils {
 
         Function<Boolean,String > c = b -> b ? green("NO") : red("YES"); 
 
-        Logger l = Logger.getLogger(Utils.class.getName());
+        Logger l = MyLoggerFactory.logger(Utils.class.getName());
         l.info("CHAPTERS_DATA_FILE: "+yellow(CHAPTERS_DATA_FILE));
         l.info("MAX_FILE_NUMBER: "+yellow(MAX_FILE_NUMBER));
         l.info("SKIP_DOUBLE_PAGE_CHECK: "+c.apply(DONT_SKIP_DOUBLE_PAGE_CHECK));
@@ -124,7 +126,7 @@ public class Utils {
                 .forEach(File::delete);
             } catch (IOException e) {}
         }
-        Logger.getLogger(Utils.class.getName()).info(yellow("\nfinished"));
+        MyLoggerFactory.logger(Utils.class.getName()).info(yellow("\nfinished"));
     }
     
     public static boolean confirm(String msg) {
@@ -170,7 +172,7 @@ public class Utils {
 
             return path;
         } catch (IOException e) {
-            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE,"failed to create dirs ", e); 
+            MyLoggerFactory.logger(Utils.class.getName()).log(Level.SEVERE,"failed to create dirs ", e); 
             throw new RuntimeException("failed to create dirs ", e);
         }
     }
@@ -219,7 +221,7 @@ public class Utils {
             try {
                 Files.write(savePath, sb.toString().getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             } catch (IOException e1) {
-                Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, "failed to write: "+savePath, e1);
+                MyLoggerFactory.logger(Utils.class.getName()).log(Level.SEVERE, "failed to write: "+savePath, e1);
             }
         }
     }
@@ -228,9 +230,9 @@ public class Utils {
             return ;
         try {
             Files.write(path, list.stream().reduce(new StringBuilder(), (s,t) -> s.append(t).append('\n'), StringBuilder::append).toString().getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            Logger.getLogger(Utils.class.getName()).info("backup: "+path.getFileName());    
+            MyLoggerFactory.logger(Utils.class.getName()).info("backup: "+path.getFileName());    
         } catch (Exception e) {
-            Logger.getLogger(Utils.class.getName()).log(Level.WARNING, "failed backup: "+path.getFileName(), e);
+            MyLoggerFactory.logger(Utils.class.getName()).log(Level.WARNING, "failed backup: "+path.getFileName(), e);
         }
     }
     public static ExecutorService runOnExecutorService(List<Runnable> tasks) {

@@ -15,12 +15,13 @@ import java.util.stream.Collectors;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 
+import sam.logging.MyLoggerFactory;
 import sam.swing.SwingUtils;
 import samrock.converters.extras.Utils;
 import samrock.converters.makestrip.ConvertProcessor;
 
 public class App {
-    static final double VERSION = 2.022;
+    static final double VERSION = 2.023;
 
     @Parameter(names= {"-h", "--help"},description = "print this", help=true, order=0)
     public boolean help;
@@ -72,7 +73,7 @@ public class App {
     }
 
     private static Logger logger() {
-        return Logger.getLogger(App.class.getSimpleName());
+        return MyLoggerFactory.logger(App.class.getSimpleName());
     }
 
     private void convertCmd() {

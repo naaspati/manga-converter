@@ -6,10 +6,10 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.logging.Logger;
 
 import sam.config.MyConfig;
 import sam.console.ANSI;
+import sam.logging.MyLoggerFactory;
 import sam.manga.samrock.chapters.ChapterWithMangaId;
 import sam.manga.samrock.converter.ConvertChapter;
 import sam.tsv.Tsv;
@@ -29,7 +29,7 @@ public class ConvertProcessor {
 
 		Tsv tsv = Tsv.parse(chaptersDataFile);
 		if(tsv.isEmpty()) {
-			Logger.getLogger(ConvertProcessor.class.getSimpleName()).info(ANSI.red("file does not have data: ")+chaptersDataFile);
+			MyLoggerFactory.logger(ConvertProcessor.class.getSimpleName()).info(ANSI.red("file does not have data: ")+chaptersDataFile);
 			return null;
 		}
 
@@ -37,7 +37,7 @@ public class ConvertProcessor {
 	}
 
 	public void process(List<ConvertChapter> chapters, boolean onlyMove)  {
-		Progressor progress = chapters.size() < 4 ? new Progressor(Logger.getLogger(ConvertProcessor.class.getName())) : new Progressor("", chapters.size());
+		Progressor progress = chapters.size() < 4 ? new Progressor(MyLoggerFactory.logger(ConvertProcessor.class.getName())) : new Progressor("", chapters.size());
 
 		Converter converter = new Converter(progress);
 		if(onlyMove) {
@@ -56,7 +56,7 @@ public class ConvertProcessor {
 	}
 
 	public void onlyOpdate(Path chaptersDataFile) throws IOException {
-		Progressor p = new Progressor(Logger.getLogger("update"));
+		Progressor p = new Progressor(MyLoggerFactory.logger("update"));
 
 		List<ConvertChapter> chapters = read(chaptersDataFile);
 		if(chapters == null || chapters.isEmpty())

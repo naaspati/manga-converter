@@ -26,6 +26,7 @@ import java.util.logging.Logger;
 
 import sam.collection.OneOrMany;
 import sam.console.ANSI;
+import sam.logging.MyLoggerFactory;
 import sam.manga.samrock.chapters.ChapterWithMangaId;
 import sam.manga.samrock.converter.ConvertChapter;
 import samrock.converters.extras.ConvertTask;
@@ -44,7 +45,7 @@ public class Converter {
     private final Progressor progress;
     private String totalSign;
     private final List<Errors> errorsList = Collections.synchronizedList(new ArrayList<>());
-    private final Logger logger = Logger.getLogger(Converter.class.getSimpleName());
+    private final Logger logger = MyLoggerFactory.logger(Converter.class.getSimpleName());
 
     public Converter(Progressor progress) {
         this.progress = progress;

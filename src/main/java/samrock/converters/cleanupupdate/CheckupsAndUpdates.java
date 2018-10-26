@@ -68,7 +68,11 @@ import sam.collection.CollectionUtils;
 import sam.collection.Iterables;
 import sam.config.MyConfig;
 import sam.console.ANSI;
-import sam.fileutils.FilesUtilsObjectNew;
+import sam.io.serilizers.ObjectReader;
+import sam.io.serilizers.ObjectWriter;
+import sam.io.serilizers.OneObjectReader;
+import sam.io.serilizers.OneObjectWriter;
+import sam.logging.MyLoggerFactory;
 import sam.manga.samrock.SamrockDB;
 import sam.manga.samrock.chapters.Chapter;
 import sam.manga.samrock.chapters.ChapterUtils;
@@ -81,7 +85,7 @@ import sam.manga.samrock.thumb.ThumbUtils;
 import sam.manga.samrock.thumb.ThumbUtils.ExtraAndMissing;
 import sam.myutils.MyUtilsCheck;
 import sam.myutils.MyUtilsException;
-import sam.myutils.MyUtilsSystem;
+import sam.myutils.System2;
 import sam.sql.querymaker.InserterBatch;
 import sam.string.StringBuilder2;
 import sam.string.StringUtils;
@@ -92,10 +96,12 @@ import samrock.converters.mangarock.MangarockDB;
 import samrock.converters.mangarock.MangarockManga;
 
 public class CheckupsAndUpdates {
+	private static final Logger LOGGER = MyLoggerFactory.logger(CheckupsAndUpdates.class.getSimpleName());
+
 	private final Path BACKUP_PATH = Utils.createBackupFolder(CheckupsAndUpdates.class);
 	private final String coloredStart = "\u001b[94;102m Start \u001b[0m";
 	private final String coloredEnd = "\u001b[94;102m End \u001b[0m\r\n";
-	private final Logger logger = Logger.getLogger(getClass().getSimpleName());
+	private final Logger logger = MyLoggerFactory.logger(getClass().getSimpleName());
 
 	private final int PROGRESS_STEPS_IN_CLEANUP_UPDATE = 7;
 	private final IntArray mangaIds;
@@ -317,16 +323,15 @@ public class CheckupsAndUpdates {
 
 			InserterBatch<MangarockManga> insert = new InserterBatch<>(TABLE_NAME);
 
-			insert
-			.setInt(MANGA_ID, MangarockManga::getMangaId)
-			.setString(DIR_NAME, MangarockManga::getDirName)
-			.setString(MANGA_NAME, MangarockManga::getName)
-			.setString(AUTHOR, MangarockManga::getAuthor)
-			.setString(DESCRIPTION, MangarockManga::getDescription)
-			.setInt(CHAP_COUNT_MANGAROCK, MangarockManga::getTotalChapters)
-			.setString(CATEGORIES, MangarockManga::getCategories)
-			.setInt(STATUS, MangarockManga::getStatus)
-			.setInt(RANK, MangarockManga::getRank);
+			insert.setInt(MANGA_ID, MangarockManga::getMangaId);
+			insert.setString(DIR_NAME, MangarockManga::getDirName);
+			insert.setString(MANGA_NAME, MangarockManga::getName);
+			insert.setString(AUTHOR, MangarockManga::getAuthor);
+			insert.setString(DESCRIPTION, MangarockManga::getDescription);
+			insert.setInt(CHAP_COUNT_MANGAROCK, MangarockManga::getTotalChapters);
+			insert.setString(CATEGORIES, MangarockManga::getCategories);
+			insert.setInt(STATUS, MangarockManga::getStatus);
+			insert.setInt(RANK, MangarockManga::getRank);
 
 			list.forEach(m -> {
 				sb.format(format1, m.getMangaId(), m.getName());
@@ -393,11 +398,11 @@ public class CheckupsAndUpdates {
 		Path p = Utils.APP_DATA.resolve("previousIdTime.dat");
 		ArrayList<int[]> updatedIds = mangarock.maneger.collectToList(qm().select("_id, time").from("MangaUpdate").where(w -> w.in("_id", MyUtilsException.noError(() -> samrock.iterator(qm().select(VersioningMeta.MANGA_ID).from(VersioningMeta.TABLE_NAME).build(), rs -> rs.getInt(1))))).build(), rs -> new int[] {rs.getInt("_id"), rs.getInt("time")});
 
-		Map<Integer, Integer> previousIdTime = Files.notExists(p) ? new HashMap<>() : FilesUtilsObjectNew.read(p);
+		Map<Integer, Integer> previousIdTime = Files.notExists(p) ? new HashMap<>() : ObjectReader.readMap(p, OneObjectReader.INT_READER, OneObjectReader.INT_READER);
 
 		updatedIds.removeIf(s -> s[1] == previousIdTime.getOrDefault(s[0], -1));
-		updatedIds.forEach(s -> previousIdTime.put(s[0], s[1])); 
-		FilesUtilsObjectNew.write(previousIdTime, p);
+		updatedIds.forEach(s -> previousIdTime.put(s[0], s[1]));
+		ObjectWriter.writeMap(p, previousIdTime, OneObjectWriter.INT_WRITER, OneObjectWriter.INT_WRITER);
 		
 		if(updatedIds.isEmpty()) {
 			System.out.println(ANSI.red("nothing to update"));
@@ -510,9 +515,8 @@ public class CheckupsAndUpdates {
 		}
 		
 		public Update3 toUpdate(int index) {
-			if(index != 1 && !Objects.equals(samrock[index], mangarock[index])) {
-				System.out.println(manga_id +"  "+samrock[index]+"  "+ mangarock[index]);
-			}
+			if(index != 1 && !Objects.equals(samrock[index], mangarock[index])) 
+				LOGGER.fine(() -> manga_id +"  "+samrock[index]+"  "+ mangarock[index]);
 			
 			String ms = mangarock[index];
 			String ss;
@@ -590,7 +594,7 @@ public class CheckupsAndUpdates {
 			Predicate<String> predicate = Pattern.compile("\\d+(?:\\.jpe?g)?").asPredicate();
 
 			Map<Integer, File> cached = 
-					Optional.ofNullable(MyUtilsSystem.lookup("THUMB_CACHE"))
+					Optional.ofNullable(System2.lookup("THUMB_CACHE"))
 					.filter(s -> !MyUtilsCheck.isEmptyTrimmed(s))
 					.map(s -> StringUtils.splitStream(s, ';'))
 					.orElse(Stream.empty())

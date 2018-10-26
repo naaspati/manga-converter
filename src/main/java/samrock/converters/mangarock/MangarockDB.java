@@ -17,9 +17,9 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 import sam.console.ANSI;
+import sam.logging.MyLoggerFactory;
 import sam.sql.querymaker.QueryMaker;
 import sam.sql.sqlite.SQLiteDB;
 
@@ -32,7 +32,7 @@ public class MangarockDB implements AutoCloseable {
         if(path == null)
             throw new SQLException("File not found: "+MANGAROCK_INPUT_DB + " |nor| "+MANGAROCK_DB_BACKUP);
         
-        Logger.getLogger(MangarockDB.class.getName()).info(ANSI.yellow("manga_db: ")+path);
+        MyLoggerFactory.logger(MangarockDB.class.getName()).info(ANSI.yellow("manga_db: ")+path);
         maneger = new SQLiteDB(path);
     }
 

@@ -28,6 +28,7 @@ import javax.swing.JOptionPane;
 
 import sam.console.ANSI;
 import sam.console.ANSI.FOREGROUND;
+import sam.logging.MyLoggerFactory;
 import sam.swing.SwingUtils;
 import samrock.converters.extras.ConvertTask;
 import samrock.converters.extras.Errors;
@@ -39,7 +40,7 @@ import samrock.converters.filechecker.ResultOrErrors;
 public class DoublePageSplitter implements Runnable {
     private static final Path BACKUP_DIR = Utils.createBackupFolder(DoublePageSplitter.class);
     private static final Path TEMP_DIR = BACKUP_DIR.resolve("temp");
-    private static final Logger logger = Logger.getLogger(DoublePageSplitter.class.getName()); 
+    private static final Logger logger = MyLoggerFactory.logger(DoublePageSplitter.class.getName()); 
 
     public static void splitSingleFolder() throws IOException{
         String folderPath = JOptionPane.showInputDialog(null, "Folder Path", "Double Page Splitter", JOptionPane.QUESTION_MESSAGE);

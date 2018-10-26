@@ -11,7 +11,7 @@ repositories {
     jcenter()
 }
 dependencies {
-   compile files('myutils.jar')
+  compile files('myutils.jar')
    compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
    compile "com.beust:jcommander:1.71"
 }
