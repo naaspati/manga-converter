@@ -70,8 +70,7 @@ import sam.config.MyConfig;
 import sam.console.ANSI;
 import sam.io.serilizers.ObjectReader;
 import sam.io.serilizers.ObjectWriter;
-import sam.io.serilizers.OneObjectReader;
-import sam.io.serilizers.OneObjectWriter;
+import sam.io.serilizers.OneObjectSerializer;
 import sam.logging.MyLoggerFactory;
 import sam.manga.samrock.SamrockDB;
 import sam.manga.samrock.chapters.Chapter;
@@ -398,11 +397,11 @@ public class CheckupsAndUpdates {
 		Path p = Utils.APP_DATA.resolve("previousIdTime.dat");
 		ArrayList<int[]> updatedIds = mangarock.maneger.collectToList(qm().select("_id, time").from("MangaUpdate").where(w -> w.in("_id", MyUtilsException.noError(() -> samrock.iterator(qm().select(VersioningMeta.MANGA_ID).from(VersioningMeta.TABLE_NAME).build(), rs -> rs.getInt(1))))).build(), rs -> new int[] {rs.getInt("_id"), rs.getInt("time")});
 
-		Map<Integer, Integer> previousIdTime = Files.notExists(p) ? new HashMap<>() : ObjectReader.readMap(p, OneObjectReader.INT_READER, OneObjectReader.INT_READER);
+		Map<Integer, Integer> previousIdTime = Files.notExists(p) ? new HashMap<>() : ObjectReader.readMap(p, OneObjectSerializer.INT, OneObjectSerializer.INT);
 
 		updatedIds.removeIf(s -> s[1] == previousIdTime.getOrDefault(s[0], -1));
 		updatedIds.forEach(s -> previousIdTime.put(s[0], s[1]));
-		ObjectWriter.writeMap(p, previousIdTime, OneObjectWriter.INT_WRITER, OneObjectWriter.INT_WRITER);
+		ObjectWriter.writeMap(p, previousIdTime, OneObjectSerializer.INT, OneObjectSerializer.INT);
 		
 		if(updatedIds.isEmpty()) {
 			System.out.println(ANSI.red("nothing to update"));
