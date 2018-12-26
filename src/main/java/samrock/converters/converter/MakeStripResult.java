@@ -6,7 +6,6 @@ import java.util.Objects;
 
 class MakeStripResult {
     public final ConvertTask task;
-    private Path result;
     private Path[] results = null;
     
     public MakeStripResult(ConvertTask task) {
@@ -23,9 +22,6 @@ class MakeStripResult {
 	}
 	public int size() {
 		return results.length;
-	}
-	public Path getResult() {
-		return result;
 	}
 	public Path[] getResults() {
 		return results;

@@ -102,9 +102,8 @@ public class Converter implements MakeStripHelper {
 		for (ConvertTask c : tasks) {
 			executorService.execute(() -> {
 				boolean success = false;
-				String n = ANSI.cyan(progress.incrementAndGet());
+				String n = ANSI.cyan(progress.incrementAndGet()+" | ");
 				Path subpath = subpath(c.source);
-
 
 				try {
 					LOGGER.info(n+START+ subpath);
@@ -210,7 +209,7 @@ public class Converter implements MakeStripHelper {
 					if(paths.length == 0)
 						throw new IOException("no conversion took place");
 					if(m.size() == 1) {
-						paths[0] = move(m.getResult(), path(source, ".jpeg"), sb);
+						paths[0] = move(m.getResults()[0], path(source, ".jpeg"), sb);
 					} else {
 						int n = 1;
 						int index = 0;
@@ -245,8 +244,8 @@ public class Converter implements MakeStripHelper {
 		return p.resolveSibling(p.getFileName()+append);
 	}
 
-	private static final String MOVE_SRC =       green(  "  src      : ");
-	private static final String MOVE_TARGET =  yellow("\n  target    : ");
+	private static final String MOVE_SRC =       green(  "  src    : ");
+	private static final String MOVE_TARGET =     yellow("\n  target : ");
 	private static final String MOVE_GARBAGED =    red(  "  garbaged : ");
 	private static final String MOVE_YELLOW_ARROW =    yellow(" -> ");
 	
