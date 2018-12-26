@@ -76,6 +76,19 @@ public class Converter implements MakeStripHelper {
 			this.result = result;
 		}
 	}
+	
+	private String progress(int n) {
+		String sp;
+		
+		if(n < 10)
+			sp = "  ";
+		else if(n < 100)
+			sp = " ";
+		else 
+			sp = "";
+		
+		return ANSI.cyan(sp+n+" | ");
+	}
 
 	/**
 	 * 
@@ -102,17 +115,17 @@ public class Converter implements MakeStripHelper {
 		for (ConvertTask c : tasks) {
 			executorService.execute(() -> {
 				boolean success = false;
-				String n = ANSI.cyan(progress.incrementAndGet()+" | ");
+				String prgs = progress(progress.incrementAndGet());
 				Path subpath = subpath(c.source);
 
 				try {
-					LOGGER.info(n+START+ subpath);
+					LOGGER.info(prgs+START+ subpath);
 					MakeStrip m = new MakeStrip(c, this);
 					MakeStripResult r = m.call();
 					result.add(r);
 
 					success = true;
-					LOGGER.info(n+SUCCESS+yellow("("+r.size()+"): ") + subpath);
+					LOGGER.info(prgs+SUCCESS+yellow("("+r.size()+"): ") + subpath);
 				} catch (StopProcessException e1) {
 					failed.set(true);
 					System.err.println("STOPPING THE CONVERSION PROCESS");
@@ -124,7 +137,7 @@ public class Converter implements MakeStripHelper {
 					errors.put(c, e1);
 				}
 				if(!success)
-					LOGGER.info(n+FAILED+ subpath);
+					LOGGER.info(prgs+FAILED+ subpath);
 			});
 		}
 
@@ -239,7 +252,7 @@ public class Converter implements MakeStripHelper {
 		}
 		return success;
 	}
-	
+
 	private Path path(Path p, String append) {
 		return p.resolveSibling(p.getFileName()+append);
 	}
