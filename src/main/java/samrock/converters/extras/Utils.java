@@ -91,6 +91,8 @@ public class Utils {
      * @return
      */
     public static Path subpath(Path p) {
+    	if(p == null) return p;
+    	
     	if(p.startsWith(SELF_DIR))
     		return p.subpath(SELF_DIR_COUNT, p.getNameCount());
     	
