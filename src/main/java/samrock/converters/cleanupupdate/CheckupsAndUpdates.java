@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -57,6 +58,7 @@ import java.util.Comparator;
 import java.util.Formatter;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -214,7 +216,7 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 
 		mangaDirs.getDirs(null)
 		.forEach(d -> dirs.put(d.name, new Dir2(d)));;
-		
+
 		idmangas.forEach((dir, manga) -> {
 			Dir2 d = dirs.get(manga.getDirName());
 			if(d != null)
@@ -382,12 +384,12 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 			Map<Dir, Dir2> dirs2 = dirs.values().stream().filter(d -> d.samrock() == null).collect(Collectors.toMap(d -> d.dir, d -> d, (o, n) -> {throw new IllegalPathStateException();}, IdentityHashMap::new));
 			Map<Dir, MinimalManga> temp = new IdentityHashMap<>();
 			dirs2.forEach((s,t) -> temp.put(s, t.idmanga()));
-			
+
 			Map<Dir, MangarockManga> temp2 = mangarockDB.load(temp, "");
 			foundCount = temp2.size();
 			Map<Dir2, MangarockManga> mangas = new IdentityHashMap<>();
 			temp2.forEach((s,t) -> mangas.put(dirs2.get(s), t));
-			
+
 			if(!newMangaConflicts(mangas))
 				return false;
 
@@ -408,7 +410,7 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 				tags.add(m.getCategories());
 			});
 			executes = insert.execute(samrockDB, mangas.values());
-			
+
 			return true;
 		} finally {
 			if(executes != -1)
@@ -421,26 +423,26 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 	private boolean newMangaConflicts(Map<Dir2, MangarockManga> mangas) {
 		if(mangas.isEmpty())
 			return true;
-		
+
 		Map<Integer, MangarockManga> mangarocks = mangas.values().stream().collect(Collectors.toMap(MangarockManga::getMangaId, s -> s));
 		Map<Integer, SamrockManga> samrocks = new HashMap<>();
-		
+
 		dirs.forEach((dirname, d) -> {
 			if(d.samrock() != null && mangarocks.containsKey(d.samrock().getMangaId()))
 				samrocks.put(d.samrock().getMangaId(), d.samrock());
 		});
-		
+
 		if(samrocks.isEmpty())
 			return true;
-		
+
 		StringBuilder2 sb = new StringBuilder2()
 				.append(ANSI.red(ANSI.createUnColoredBanner("NEW MANGA CONFLICT")))
 				.ln();
-		
+
 		samrocks.forEach((id, samrock) -> {
 			MangarockManga mangarock = mangarocks.get(id);
 			char[] indent = {' ', ' '};
-			
+
 			sb.yellow(id).ln()
 			.append(indent).cyan("dir_name").ln()
 			.append(indent).append(indent).append("samrock:   ").append(samrock.getDirName()).ln()
@@ -449,30 +451,51 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 			.append(indent).append(indent).append("samrock:   ").append(samrock.getMangaName()).ln()
 			.append(indent).append(indent).append("mangarock: ").append(mangarock.getMangaName()).ln().ln();
 		});
-		
+
 		LOGGER.info(sb.toString());
-		
+
 		if(!confirm("continue?"))
 			return false;
-		
+
 		dirs.forEach((dirname, dir) -> {
 			MangarockManga m = mangas.get(dir);
 			if(m == null)
 				return;
 			SamrockManga s = samrocks.get(m.getMangaId());
+
 			if(s != null) {
 				dir.samrock(s);
 				dir.mangarock(null);
 				mangas.remove(dir);
+
+				Path mp = mangaDirs.getMangaDir().resolve(m.getDirName());
+				Path sp = mangaDirs.getMangaDir().resolve(s.getDirName());
+
+				try {
+					if(!Files.isSameFile(mp, sp)) {
+						Iterator<Path> itr = Files.list(mp).iterator();
+						while (itr.hasNext()) {
+							Path path = itr.next();
+							Path target = sp.resolve(path.getFileName());
+
+							Files.move(path, target, StandardCopyOption.REPLACE_EXISTING);
+							LOGGER.info(green("moved: ")+subpath(path)+yellow(" -> ")+subpath(target));
+						}
+						if(Files.deleteIfExists(mp))
+							LOGGER.info(green("deleted: ")+subpath(mp));
+					}
+				} catch (IOException e) {
+					LOGGER.log(Level.SEVERE, red("failed-moved: ")+subpath(mp)+yellow(" -> ")+subpath(sp), e);
+				}
 			}
 		});
-		
+
 		dirs.forEach((dirname, d) -> {
 			MangarockManga m = mangas.get(d);
 			if(m != null && !samrocks.containsKey(m.getMangaId()))
 				d.mangarock(m);
 		});
-		
+
 		return true;
 	}
 
