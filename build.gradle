@@ -1,26 +1,28 @@
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
 
 apply plugin: 'java'
 apply plugin: 'application'
-
-// i complicated this app too much, so skipping unit testing
 
 repositories {
     jcenter()
 }
 dependencies {
-  compile files('myutils.jar')
+   compile files('myutils.jar', '../DownloaderDB/build/libs/DownloaderDB.jar')
+   // compile fileTree(dir: '../DownloaderDB/build/libs', include:'*.jar')
+   compile 'org.json:json:20180130'
    compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
-   compile "com.beust:jcommander:1.71"
 }
 
-version = 2.00
+version = 2.015
 sourceCompatibility = JavaVersion.VERSION_1_8 
 targetCompatibility = JavaVersion.VERSION_1_8
+
+ext.appdir = file(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter\bin/)
  
-mainClassName = 'samrock.converters.app.main.App'
+mainClassName = 'Main'
 
 run {
   if(System.properties['args'])  //pass args from cmd as -Dargs="args separated by space"
@@ -36,24 +38,44 @@ run {
   */
 }
 
-task copy(type: Copy, dependsOn:'installDist') { 
-  from(fileTree("$buildDir/install/${distributions.main.baseName}"))
-  into(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter\app/)
+task deleteJars {
+  delete fileTree(appdir) {
+    include '*.jar'
+  }
+}
+
+task install(type: Copy, dependsOn:[installDist, deleteJars]) {
+  def libdir = file(new File(installDist.destinationDir, 'lib')) 
+  from libdir
+  into appdir
   
   doLast {
-     Files.copy(file('logging.properties').toPath(), Paths.get(/D:\Core Files\Emulator\dolphin\Manga\Data\Converter\logging.properties/), , StandardCopyOption.REPLACE_EXISTING);
-  }
+     new File(appdir, 'run.cmd').text = """
+  @echo off
+  setlocal
   
+  ${versionText()}
+  
+  java %JVM_OPTS% %JAVA_OPTS% -cp \"%~dp0;%~dp0${String.join(';%~dp0', libdir.list())}\" ${mainClassName} %*
+  
+  """.stripIndent()
+  } 
 }
 
-jar {
-  manifest {
-        attributes('Manifest-Version': '1.0',
-                   'Implementation-Version': version,
-                   'Main-Class':"$mainClassName",	
-                   'Class-Path':'.'
-                   )
-    }
+def versionText() {
+  if(!version && version == 'unspecified') return '';
+  String s = "echo version: %APP_VERSION% (${LocalDateTime.now()}^)"
+  return """
+  SET APP_VERSION=${version}
+  if [%1]==[-v] (
+    ${s}
+    goto:eof
+  )
+  if [%1]==[--version] (
+    ${s}
+    goto:eof
+  )
+  """;    
 }
 
-defaultTasks 'iD', 'copy'
+defaultTasks 'install'

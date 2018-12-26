@@ -1,11 +1,15 @@
 package samrock.converters.mangarock;
 
+import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import sam.manga.samrock.mangas.MangaUtils;
+import sam.manga.samrock.Renamer;
+import sam.manga.samrock.chapters.MinimalChapter;
+import sam.manga.samrock.mangas.MinimalManga;
+import sam.nopkg.Junk;
 
-public class MangarockManga {
+public class MangarockManga implements MinimalManga {
     public static final String AUTHOR = "author";
     public static final String CATEGORIES = "categories";
     public static final String DESCRIPTION = "description";
@@ -69,7 +73,7 @@ public class MangarockManga {
     
     private String dirName;
     public String getDirName() {
-    	return dirName != null ? dirName : (dirName = MangaUtils.toDirName(getName()));
+    	return dirName != null ? dirName : (dirName = Renamer.mangaDirName(getName()));
     }
     
 	@Override
@@ -77,5 +81,17 @@ public class MangarockManga {
 		return "MangarockManga [author=" + author + ", categories=" + categories + ", description=" + description
 				+ ", name=" + name + ", totalChapters=" + totalChapters + ", lastUpdate=" + lastUpdate + ", _id=" + _id
 				+ ", status=" + status + ", rank=" + rank + "]";
+	}
+	@Override
+	public Path getDirPath() {
+		return Junk.notYetImplemented();
+	}
+	@Override
+	public String getMangaName() {
+		return getName();
+	}
+	@Override
+	public Iterable<? extends MinimalChapter> getChapterIterable() {
+		return Junk.notYetImplemented();
 	}
 }
