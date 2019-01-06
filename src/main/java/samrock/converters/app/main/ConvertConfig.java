@@ -39,7 +39,7 @@ public class ConvertConfig extends CmdInitBase {
 
 	public boolean mangarockMoveOnly;
 	public String convertFoldersInFolder;
-	public boolean dirs, full, update, dry_run, splitAll;
+	public boolean dirs, full, update, dry_run, splitAll, rightToLeft;
 
 	private Path downloaderDB;
 
@@ -99,6 +99,9 @@ public class ConvertConfig extends CmdInitBase {
 					break;
 				case "--dirs":
 					dirs = true;
+					break;
+				case "-right-to-left":
+					rightToLeft = true;
 					break;
 				case "-max-number":
 					if((max_file_number = getNumber(s, iterator)) < 0)
@@ -255,6 +258,7 @@ public class ConvertConfig extends CmdInitBase {
 				{"  --dirs",         "Convert Folders In Folder"},
 				{"  -u, --update",    "update with given chapters data"},
 				{"OPTIONS", ""},
+				{"-right-to-left", "split image from right-to-left"},
 				{"  -ddb, --downloader-db [FILE]", "set downloader db path"},
 				{"  -max-number [INT]", "max_file_number"},
 				{"  -thread-count [INT]", "number of threads"},
@@ -271,7 +275,7 @@ public class ConvertConfig extends CmdInitBase {
 		}
 		
 		if(splitAll) {
-			new DoublePageSplitter(this).call();
+			new DoublePageSplitter(this, rightToLeft).call();
 		} else if(full)
 			new ConvertProcessor(this).full();
 		else if(update)

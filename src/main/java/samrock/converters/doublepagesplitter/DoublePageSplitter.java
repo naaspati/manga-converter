@@ -8,11 +8,13 @@ import static java.nio.file.StandardOpenOption.WRITE;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,9 +37,11 @@ public class DoublePageSplitter implements Callable<Void> {
 	private static final Logger LOGGER = MyLoggerFactory.logger(DoublePageSplitter.class);
 	private final ConvertConfig config;
 	private final AtomicInteger counter = new AtomicInteger(0);
+	private final boolean  rightToLeft;
 
-	public DoublePageSplitter(ConvertConfig config) {
+	public DoublePageSplitter(ConvertConfig config, boolean  rightToLeft) {
 		this.config = config;
+		this.rightToLeft = rightToLeft;
 	}
 
 	@Override
@@ -45,8 +49,11 @@ public class DoublePageSplitter implements Callable<Void> {
 		Path path = Paths.get(".").normalize().toAbsolutePath();
 		if(!Files.isSameFile(path.getParent(), Utils.MANGA_DIR))
 			throw new IllegalArgumentException(String.format("path.getParent() != Utils.MANGA_DIR\npath.getParent():%s\nUtils.MANGA_DIR: %s", path.getParent(), Utils.MANGA_DIR));
-
-		List<Path> dirs = Files.list(path).filter(Files::isDirectory).collect(Collectors.toList());
+		
+		List<Path> dirs = Arrays.stream(path.toFile().list())
+				.map(path::resolve)
+				.filter(Files::isDirectory)
+				.collect(Collectors.toList());
 
 		if(dirs.isEmpty()) {
 			LOGGER.info(ANSI.red("no dirs dound"));
@@ -83,18 +90,24 @@ public class DoublePageSplitter implements Callable<Void> {
 			LOGGER.info(ANSI.yellow(Utils.subpath(pair.key)));
 
 			for (CheckedFile file : pair.value) {
-				BufferedImage m = ImageIO.read(Files.newInputStream(file.getPath(), READ));
-				
-				if (m.getWidth() < 1000) {
-		            list.add(Files.copy(file.getPath(), temp(), REPLACE_EXISTING));
-		            LOGGER.warning("\tpossibly a single page: " + file.getPath().getFileName());
-		            continue;
-		        }
-		        list.add(split(m, true));
-		        list.add(split(m, false));
+				try(InputStream is = Files.newInputStream(file.getPath(), READ)) {
+					BufferedImage m = ImageIO.read(is);
+					
+					if (m.getWidth() < 1000) {
+			            list.add(Files.copy(file.getPath(), temp(), REPLACE_EXISTING));
+			            LOGGER.warning("\tpossibly a single page: " + file.getPath().getFileName());
+			            continue;
+			        }
+					if(rightToLeft) {
+						list.add(split(m, false));
+						list.add(split(m, true));
+					} else {
+						list.add(split(m, true));
+				        list.add(split(m, false));	
+					}
+				}
 			}
 		}
-		
 		
 		Path backdir = mdirs.createBackupFolder(DoublePageSplitter.class);
 
