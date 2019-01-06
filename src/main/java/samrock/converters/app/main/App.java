@@ -5,6 +5,7 @@ import static sam.console.ANSI.yellow;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,9 +19,8 @@ import sam.nopkg.Junk;
 public class App {
 	private static final Logger LOGGER = MyLoggerFactory.logger(App.class);
  
-	private static final List<Class<? extends CmdInit>> command_classes = Arrays.asList(ConvertConfig.class, Split.class);
+	private static final List<Class<? extends CmdInit>> command_classes = Collections.singletonList(ConvertConfig.class);
 	private static final Map<String, Class<? extends CmdInit>> command_map = new LinkedHashMap<>();
-	
 
 	static {
 		for (Class<? extends CmdInit> c : command_classes) {

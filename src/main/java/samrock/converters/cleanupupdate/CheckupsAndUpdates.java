@@ -317,7 +317,7 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 		System.out.println(yellow(string));
 	}
 	private void processTags() throws SQLException {
-		int[] sam = samrockDB.stream(qm().select(TagsMeta.ID).from(TagsMeta.TABLE_NAME).build(), rs -> rs.getInt(1)).mapToInt(Integer::intValue).toArray();
+		int[] sam = samrockDB.stream(qm().select(TagsMeta.ID).from(TagsMeta.TAGS_TABLE_NAME).build(), rs -> rs.getInt(1)).mapToInt(Integer::intValue).toArray();
 		Arrays.sort(sam);
 
 		int[] array = tags.stream()
@@ -329,7 +329,7 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 
 		StringBuilder sb = new StringBuilder();
 		sb.append(yellow("New Tags\n"));
-		samrockDB.prepareStatementBlock(qm().insertInto(TagsMeta.TABLE_NAME).placeholders(TagsMeta.ID, TagsMeta.NAME), ps -> {
+		samrockDB.prepareStatementBlock(qm().insertInto(TagsMeta.TAGS_TABLE_NAME).placeholders(TagsMeta.ID, TagsMeta.NAME), ps -> {
 			mangarockDB.maneger.iterate(qm().select("distinct categoryId,categoryName").from("SourceCategoryMap").where(w -> w.in("categoryId", array)).build(), rs -> {
 				int n;
 				String s;
@@ -526,7 +526,7 @@ public class CheckupsAndUpdates implements Callable<Boolean> {
 		LOGGER.info(coloredMsgMaker("Total updates: ")+coloredStart);
 
 		Path p = APP_DATA.resolve("previousIdTime.dat");
-		ArrayList<int[]> updatedIds = mangarockDB.maneger.collectToList(qm().select("_id, time").from("MangaUpdate").where(w -> w.in("_id", MyUtilsException.noError(() -> samrockDB.iterator(qm().select(VersioningMeta.MANGA_ID).from(VersioningMeta.TABLE_NAME).build(), rs -> rs.getInt(1))))).build(), rs -> new int[] {rs.getInt("_id"), rs.getInt("time")});
+		ArrayList<int[]> updatedIds = mangarockDB.maneger.collectToList(qm().select("_id, time").from("MangaUpdate").where(w -> w.in("_id", MyUtilsException.noError(() -> samrockDB.iterator(qm().select(VersioningMeta.MANGA_ID).from(VersioningMeta.VERSIONING_TABLE_NAME).build(), rs -> rs.getInt(1))))).build(), rs -> new int[] {rs.getInt("_id"), rs.getInt("time")});
 
 		Map<Integer, Integer> previousIdTime = Files.notExists(p) ? new HashMap<>() : ObjectReader.readMap(p, DataInputStream::readInt, DataInputStream::readInt);
 

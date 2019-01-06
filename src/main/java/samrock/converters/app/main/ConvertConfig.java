@@ -22,6 +22,7 @@ import sam.myutils.MyUtilsCmd;
 import sam.myutils.System2;
 import sam.nopkg.Junk;
 import samrock.converters.converter.ConvertProcessor;
+import samrock.converters.doublepagesplitter.DoublePageSplitter;
 import samrock.converters.extras.Utils;
 @Cmd({"-c", "--convert"})
 public class ConvertConfig extends CmdInitBase {
@@ -38,7 +39,7 @@ public class ConvertConfig extends CmdInitBase {
 
 	public boolean mangarockMoveOnly;
 	public String convertFoldersInFolder;
-	public boolean dirs, full, update, dry_run;
+	public boolean dirs, full, update, dry_run, splitAll;
 
 	private Path downloaderDB;
 
@@ -92,6 +93,9 @@ public class ConvertConfig extends CmdInitBase {
 					break;
 				case "--full":
 					full = true;
+					break;
+				case "--split-all":
+					splitAll = true;
 					break;
 				case "--dirs":
 					dirs = true;
@@ -246,6 +250,7 @@ public class ConvertConfig extends CmdInitBase {
 				{"  -h, --help",      "print this"},
 				{"  --full",      "scan manga_dir for convertion/convert"},
 				{"  --dry-run",      "dry run"},
+				{"  --split-all",      "split double pages in current dir"},
 				{"  --move-only",    "only Moves Mangarock Data"},
 				{"  --dirs",         "Convert Folders In Folder"},
 				{"  -u, --update",    "update with given chapters data"},
@@ -265,7 +270,9 @@ public class ConvertConfig extends CmdInitBase {
 			return;
 		}
 		
-		if(full)
+		if(splitAll) {
+			new DoublePageSplitter(this).call();
+		} else if(full)
 			new ConvertProcessor(this).full();
 		else if(update)
 			new ConvertProcessor(this).onlyUpdate();
