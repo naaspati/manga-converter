@@ -1,6 +1,7 @@
 package samrock.converters.cleanupupdate;
 
-import static sam.manga.samrock.mangas.MangasMeta.*;
+import static sam.manga.samrock.mangas.MangasMeta.DIR_NAME;
+import static sam.manga.samrock.mangas.MangasMeta.LAST_UPDATE_TIME;
 import static sam.manga.samrock.mangas.MangasMeta.MANGA_ID;
 import static sam.manga.samrock.mangas.MangasMeta.MANGA_NAME;
 

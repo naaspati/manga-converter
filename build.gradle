@@ -16,7 +16,7 @@ dependencies {
    compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
 }
 
-version = 2.015
+version = 2.016
 sourceCompatibility = JavaVersion.VERSION_1_8 
 targetCompatibility = JavaVersion.VERSION_1_8
 
@@ -37,10 +37,12 @@ run {
   environment.CHAPTERS_DATA_FILE = 'environment.txt'
   */
 }
-
 task deleteJars {
-  delete fileTree(appdir) {
-    include '*.jar'
+  doLast {
+     file(appdir).listFiles().each({
+       if(it.name.endsWith('.jar'))
+         it.delete();
+     });
   }
 }
 

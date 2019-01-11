@@ -4,7 +4,6 @@ import static sam.console.ANSI.yellow;
 
 import java.io.Closeable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -15,7 +14,7 @@ import java.util.logging.Logger;
 
 import sam.logging.MyLoggerFactory;
 import sam.myutils.System2;
-import sam.nopkg.Junk;
+import sam.thread.MyUtilsThread;
 public class App {
 	private static final Logger LOGGER = MyLoggerFactory.logger(App.class);
  
@@ -56,7 +55,7 @@ public class App {
 					map.put(s, current = new ArrayList<>());
 			} else {
 				if(current == null) {
-					LOGGER.info(Junk.stackLocation() + red("unknown command: ")+s);
+					LOGGER.info(MyUtilsThread.stackLocation() + red("unknown command: ")+s);
 					return;
 				}
 				current.add(s);
@@ -64,7 +63,7 @@ public class App {
 		}
 		
 		if(map.isEmpty()) {
-			System.out.println(Junk.stackLocation() + red("  no command specified"));
+			System.out.println(MyUtilsThread.stackLocation() + red("  no command specified"));
 			printHelp();
 		}
 		

@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 import sam.logging.MyLoggerFactory;
 import sam.myutils.MyUtilsCmd;
 import sam.myutils.System2;
-import sam.nopkg.Junk;
+import sam.thread.MyUtilsThread;
 import samrock.converters.converter.ConvertProcessor;
 import samrock.converters.doublepagesplitter.DoublePageSplitter;
 import samrock.converters.extras.Utils;
@@ -138,7 +138,7 @@ public class ConvertConfig extends CmdInitBase {
 			//default
 			else {
 				if(list == null) {
-					LOGGER.info(Junk.stackLocation()+red(" unknown command: ")+s);
+					LOGGER.info(MyUtilsThread	.stackLocation()+red(" unknown command: ")+s);
 					return false;
 				} else {
 					list.add(s);
@@ -282,7 +282,7 @@ public class ConvertConfig extends CmdInitBase {
 			new ConvertProcessor(this).onlyUpdate();
 		else {
 			LOGGER.info(FAILED_BANNER);
-			LOGGER.info(Junk.stackLocation()+red(" Doesn't know what to do"));
+			LOGGER.info(MyUtilsThread.stackLocation()+red(" Doesn't know what to do"));
 		}
 	}
 	private String string(boolean b) {
