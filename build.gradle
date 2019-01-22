@@ -10,13 +10,15 @@ repositories {
     jcenter()
 }
 dependencies {
-   compile files('myutils.jar', '../DownloaderDB/build/libs/DownloaderDB.jar')
-   // compile fileTree(dir: '../DownloaderDB/build/libs', include:'*.jar')
+   compile files('myutils.jar')
+   implementation (project(':DownloaderDB')) {
+      transitive = false
+    }
    compile 'org.json:json:20180130'
    compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.7.2'
 }
 
-version = 2.016
+version = 2.017
 sourceCompatibility = JavaVersion.VERSION_1_8 
 targetCompatibility = JavaVersion.VERSION_1_8
 

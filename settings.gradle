@@ -15,4 +15,7 @@ include 'api'
 include 'services:webservice'
 */
 
+include ':DownloaderDB'
+project(':DownloaderDB').projectDir = file('../DownloaderDB')
+
 rootProject.name = 'SamRock_Converter'

@@ -26,6 +26,7 @@ import javax.imageio.ImageIO;
 import sam.io.fileutils.FileOpener;
 import sam.io.serilizers.StringWriter2;
 import sam.logging.MyLoggerFactory;
+import sam.myutils.System2;
 import samrock.converters.converter.CExceptions.ConversionException;
 import samrock.converters.converter.CExceptions.DoublePagesException;
 import samrock.converters.converter.CExceptions.StopProcessException;
@@ -40,6 +41,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
 	private static final int MAX_IMAGE_HEIGHT = 65500;
 	private static final Path MY_DIR;
 	private static final AtomicInteger COUNTER;
+	private static final int PAGE_MAX_WIDTH = Optional.ofNullable(System2.lookup("PAGE_MAX_WIDTH")).map(Integer::parseInt).orElse(1200);
 
 	static {
 		MY_DIR = Utils.TEMP_DIR.resolve(MakeStrip.class.getName());
@@ -145,7 +147,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
 					imageErrorString += String.format("\n  %s: Image Size Error(%sX%s)", path.getFileName(), w, h);	
 					setImageError(); 
 				}
-				if(DONT_SKIP_DOUBLE_PAGE_CHECK && w > 1000)
+				if(DONT_SKIP_DOUBLE_PAGE_CHECK && w > PAGE_MAX_WIDTH)
 					doublePages.add(path.getFileName().toString());
 
 				if(height + h > MAX_IMAGE_HEIGHT) {
