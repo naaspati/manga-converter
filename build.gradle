@@ -11,7 +11,7 @@ repositories {
 }
 dependencies {
    compile files('myutils.jar')
-   implementation (project(':DownloaderDB')) {
+    implementation (project(':DownloaderDB')) {
       transitive = false
     }
    compile 'org.json:json:20180130'

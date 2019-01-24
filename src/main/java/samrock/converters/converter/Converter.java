@@ -33,7 +33,9 @@ import java.util.stream.Stream;
 import sam.console.ANSI;
 import sam.io.serilizers.StringWriter2;
 import sam.logging.MyLoggerFactory;
+import sam.myutils.MyUtilsException;
 import sam.myutils.MyUtilsPath;
+import sam.myutils.System2;
 import sam.string.SubSequence;
 import samrock.converters.app.main.ConvertConfig;
 import samrock.converters.cleanupupdate.MangaDirs;
@@ -76,17 +78,17 @@ public class Converter implements MakeStripHelper {
 			this.result = result;
 		}
 	}
-	
+
 	private String progress(int n) {
 		String sp;
-		
+
 		if(n < 10)
 			sp = "  ";
 		else if(n < 100)
 			sp = " ";
 		else 
 			sp = "";
-		
+
 		return ANSI.cyan(sp+n+" | ");
 	}
 
@@ -207,9 +209,9 @@ public class Converter implements MakeStripHelper {
 			sb.append("---------------\n");
 			yellow(sb, dir.file.getName());
 			sb.append("\n---------------\n");
-			
+
 			LOGGER.info(sb.substring(start));
-			
+
 			for (MakeStripResult m : list) {
 				final Path source = m.task.source;
 				final Path[] paths = new Path[m.size()];
@@ -217,7 +219,7 @@ public class Converter implements MakeStripHelper {
 				sb.append(MOVING).append(subpath(source));
 				LOGGER.info(sb.substring(start));
 				sb.append('\n');
-				
+
 				try {
 					if(paths.length == 0)
 						throw new IOException("no conversion took place");
@@ -242,7 +244,7 @@ public class Converter implements MakeStripHelper {
 				}
 			}
 		});
-		
+
 		Path p = Utils.TEMP_DIR.resolve(getClass().getName()+"-move-log-"+MyUtilsPath.pathFormattedDateTime()+".txt");
 		try {
 			StringWriter2.setText(p, sb);
@@ -261,7 +263,7 @@ public class Converter implements MakeStripHelper {
 	private static final String MOVE_TARGET =     yellow("\n  target : ");
 	private static final String MOVE_GARBAGED =    red(  "  garbaged : ");
 	private static final String MOVE_YELLOW_ARROW =    yellow(" -> ");
-	
+
 	private Path move(Path src, Path target, StringBuilder log) throws IOException {
 		Path backup = backup(target, log);
 		if(backup != null) {
@@ -275,14 +277,14 @@ public class Converter implements MakeStripHelper {
 		}
 
 		Path p = Files.move(src, target, StandardCopyOption.REPLACE_EXISTING);
-		
+
 		int len = log.length();
 		log.append(MOVE_SRC).append(subpath(src)).append(MOVE_TARGET).append(subpath(target));
 		LOGGER.info(log.substring(len));
 		log.append('\n');
 		return p;
 	}
-	
+
 	private static final String _BACKUP = ANSI.cyan("  BACKUP");
 	private Path backup(Path p, StringBuilder logs) throws IOException {
 		Path t = mangaDirs.backupMove(p, IMAGES_BACKUP_DIR);
@@ -292,15 +294,39 @@ public class Converter implements MakeStripHelper {
 
 	private void append(Map<ConvertTask, ?> errors, StringBuilder sb, String title) {
 		if(!errors.isEmpty()) {
-			sb.append(createBanner(title)).append('\n');
+			createBanner(title, sb).append('\n');
 			Map<Dir, List<ConvertTask>> map = errors.keySet().stream().collect(Collectors.groupingBy(c -> c.dir, IdentityHashMap::new, Collectors.toList()));
 			map.forEach((dir, list) -> {
 				yellow(sb, "\n-------------------------------\n");
 				yellow(sb, dir.file.getName()).append('\n');
 				int start = sb.length();
-				list.forEach(c -> sb.append(ANSI.cyan(c.source.getFileName())).append("\n").append(errors.get(c)).append('\n'));
+				list.forEach(c -> {
+					sb.append(ANSI.cyan(c.source.getFileName())).append("\n");
+					Object o = errors.get(c);
+					if(o instanceof Throwable)
+						append(sb, (Throwable)o);
+					else
+						sb.append(o);
+					sb.append('\n');
+				});
 				write(sb, start, dir);
 			});
+		}
+	}
+
+	private static final boolean stacktrace = System2.lookupBoolean("stacktrace", false);
+	
+	private void append(StringBuilder sb, Throwable e) {
+		if(stacktrace) {
+			MyUtilsException.append(sb, e, true);
+		} else {
+			sb.append("\n");
+			MyUtilsException.append(sb, e, false);
+			
+			if(e.getCause() != null) {
+				sb.append('\n');
+				append(sb, e.getCause());
+			}	
 		}
 	}
 

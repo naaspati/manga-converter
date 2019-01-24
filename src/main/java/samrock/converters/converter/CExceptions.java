@@ -25,6 +25,9 @@ interface CExceptions {
 		public ConversionException(String msg) {
 			super(msg);
 		}
+		public ConversionException(String msg, Throwable e) {
+			super(msg, e);
+		}
 		private static final long serialVersionUID = 1L;
 
 	}

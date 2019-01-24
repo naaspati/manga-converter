@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -208,7 +209,15 @@ public class ConvertProcessor {
 			list.stream()
 			.map(d -> d.tasks.dir)
 			.distinct()
+			.filter(d -> {
+				File file = d.file;
+				String[] ss = file.list();
+				if(ss == null)
+					return false;
+				return Arrays.stream(ss).noneMatch(s -> new File(file, s).isDirectory());
+			})
 			.forEach(d -> d.current = d.file.lastModified());
+			
 			mangaDirs.save(dirs, getClass());	
 		}
 	}

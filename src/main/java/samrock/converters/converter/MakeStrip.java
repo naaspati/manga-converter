@@ -108,7 +108,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
 		if(result != null)
 			result = null;
 	}
-	private void call2() throws IOException, ConversionException, StopProcessException, DoublePagesException {
+	private void call2() throws ConversionException, StopProcessException, DoublePagesException {
 		if(helper.isCanceled()) return;
 
 		this.result = new MakeStripResult(task);
@@ -119,12 +119,12 @@ public class MakeStrip implements Callable<MakeStripResult> {
 		int height = 0;
 		String imageErrorString = "";
 
-		for (CheckedFile t : task.getFiles()) {
+		for (CheckedFile cf : task.getFiles()) {
 			if(helper.isCanceled()) return;
 
-			if(t == null)
+			if(cf == null)
 				continue;
-			Path path = t.getPath();
+			Path path = cf.getPath();
 
 			BufferedImage img = null;
 
@@ -141,7 +141,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
 					String s = "something is fishy, image height found to be: "+h+"\t"+task.getSource();
 					StringWriter2.setText(p, s);
 					FileOpener.openFile(p.toFile());
-					throw new StopProcessException("FISHY_CHECK: "+s);
+					throw new StopProcessException("FISHY_CHECK: "+s+", "+Utils.subpath(path));
 				}
 				if(DONT_SKIP_PAGE_SIZE_CHECK && (w < 100 || h < 100)) {
 					imageErrorString += String.format("\n  %s: Image Size Error(%sX%s)", path.getFileName(), w, h);	
@@ -162,6 +162,9 @@ public class MakeStrip implements Callable<MakeStripResult> {
 
 				if(!imageError)
 					images.add(img);
+				
+			} catch (IOException|NullPointerException e) {
+				throw new ConversionException(cf.toString(), e);
 			}
 		}
 
@@ -181,7 +184,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
 			convert(width, height);
 	}
 
-	private boolean convert(int width, int height) throws IOException, ConversionException {
+	private boolean convert(int width, int height) throws ConversionException {
 		if(helper.isCanceled()) return false;
 
 		Path temp = createStrip(width, height);
@@ -194,7 +197,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
 		return false;
 
 	}
-	private Path createStrip(final int width, final int height) throws IOException, ConversionException {
+	private Path createStrip(final int width, final int height) throws ConversionException {
 		if(helper.isCanceled()) return null;
 
 		Path temp = MY_DIR.resolve(String.valueOf(COUNTER.incrementAndGet()));
@@ -222,7 +225,7 @@ public class MakeStrip implements Callable<MakeStripResult> {
 			ImageIO.write(finalImage, "jpeg", os);
 			return temp;
 		} catch (IOException e) {
-			throw new IOException("Unable to save Image(in temp)", e);
+			throw new ConversionException("Unable to save Image(in temp)", e);
 		}
 	}
 }
